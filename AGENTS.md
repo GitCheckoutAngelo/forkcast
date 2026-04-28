@@ -12,6 +12,7 @@ A personal weekly meal planner. Build 7-day plans from a recipe bank, track macr
 
 - **Next.js 16** (App Router, TypeScript, Turbopack, Tailwind, `src/` layout)
 - **Supabase** (Postgres + Auth + auto-generated Data API, used via `@supabase/supabase-js` and `@supabase/ssr`)
+  - Uses new key naming: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY`
 - **Anthropic API** (`@anthropic-ai/sdk`) for AI-assisted recipe scraping and food item lookup
 - **Node 24 LTS**
 
