@@ -112,6 +112,7 @@ When a user signs up via Supabase Auth, a `user_profiles` row must be created to
 - **No `localStorage` for app data.** Supabase is the source of truth; the only client-side state is auth session (handled by `@supabase/ssr`) and ephemeral UI state.
 - **No AI-generated meal plans yet.** Manual planning only. This may be added later — schema supports it.
 - **No AI writes to DB.** Candidates flow to user confirmation first, always.
+- **Ingredient units are free-form strings, not a dropdown.** Scraped recipes use messy units (handful, pinch, medium, to taste) that don't fit a finite enum. Unit normalization for shopping lists will be handled by AI at aggregation time, not at input time.
 
 ## Conventions
 
