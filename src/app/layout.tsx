@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { Fraunces, Inter } from "next/font/google"
 import "./globals.css"
-import Shell from "@/components/layout/shell"
 import { Toaster } from "@/components/ui/sonner"
 
 const fraunces = Fraunces({
@@ -30,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${fraunces.variable} ${inter.variable} h-full`}>
       <body className="min-h-full bg-background text-foreground antialiased">
-        <Shell>{children}</Shell>
+        {children}
         <Toaster />
       </body>
     </html>

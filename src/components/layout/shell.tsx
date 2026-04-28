@@ -1,10 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { createClient } from "@/lib/supabase/browser"
-import { logout } from "@/app/actions"
+import { logout } from "@/lib/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -25,22 +23,14 @@ const navItems = [
   { href: "/plans", label: "Plans" },
 ]
 
-export default function Shell({ children }: { children: React.ReactNode }) {
+export default function Shell({
+  children,
+  userEmail,
+}: {
+  children: React.ReactNode
+  userEmail: string | null
+}) {
   const pathname = usePathname()
-  const [userEmail, setUserEmail] = useState<string | null>(null)
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then((result) => {
-      setUserEmail(result.data.user?.email ?? null)
-    })
-  }, [])
-
-  const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/signup")
-
-  if (isAuthPage) {
-    return <>{children}</>
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -61,7 +51,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                       "rounded-full px-3 py-2 text-sm font-medium transition-all",
                       active
                         ? "bg-primary/10 text-primary"
-                        : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                   >
                     {item.label}
@@ -72,7 +62,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="hidden items-center gap-4 md:flex">
-            <p className="text-sm text-foreground/70">{userEmail ?? "Signed in"}</p>
+            <p className="text-sm text-muted-foreground">{userEmail ?? "Signed in"}</p>
             <form action={logout}>
               <Button type="submit" size="sm" variant="outline">
                 Logout
@@ -82,7 +72,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
           <div className="md:hidden">
             <Sheet>
-              <SheetTrigger className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <SheetTrigger render={<Button size="icon" variant="ghost" />}>
                 <Menu className="size-4" />
                 <span className="sr-only">Open menu</span>
               </SheetTrigger>
@@ -95,7 +85,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                       <span className="sr-only">Close</span>
                     </SheetClose>
                   </div>
-                  <p className="text-sm text-foreground/70">Plan your meals, hit your macros.</p>
+                  <p className="text-sm text-muted-foreground">Plan your meals, hit your macros.</p>
                 </SheetHeader>
                 <div className="space-y-3 px-4">
                   {navItems.map((item) => {
@@ -108,7 +98,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                           "block rounded-3xl px-4 py-4 text-base font-medium transition-colors",
                           active
                             ? "bg-primary/10 text-primary"
-                            : "text-foreground/80 hover:bg-muted hover:text-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                       >
                         {item.label}
@@ -118,9 +108,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 </div>
                 <Separator className="my-4" />
                 <div className="space-y-3 px-4">
-                  <div className="rounded-3xl border border-border bg-card px-4 py-4">
-                    <p className="text-sm text-foreground/70">Signed in as</p>
-                    <p className="mt-1 text-sm font-medium text-foreground">{userEmail ?? "Loading..."}</p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Signed in as</p>
+                    <p className="mt-0.5 text-sm font-medium text-foreground">{userEmail ?? "Loading..."}</p>
                   </div>
                   <form action={logout}>
                     <Button type="submit" size="sm" className="w-full">
