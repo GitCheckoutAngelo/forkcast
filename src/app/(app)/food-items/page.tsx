@@ -1,17 +1,13 @@
-export default function FoodItemsPage() {
+import { Suspense } from 'react'
+import { listFoodItems } from '@/lib/food-items/queries'
+import FoodItemsClient from './food-items-client'
+
+export default async function FoodItemsPage() {
+  const items = await listFoodItems()
+
   return (
-    <div>
-      <div className="w-full max-w-md mx-auto rounded-4xl border border-border bg-card p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-          Food Items
-        </p>
-        <h1 className="mt-4 text-4xl font-heading tracking-tight text-foreground">
-          Coming soon
-        </h1>
-        <p className="mt-3 text-base leading-7 text-muted-foreground">
-          Food item tracking is being built here next.
-        </p>
-      </div>
-    </div>
+    <Suspense>
+      <FoodItemsClient items={items} />
+    </Suspense>
   )
 }
