@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Search, UtensilsCrossed, X } from 'lucide-react'
+import { ChevronDown, Link, Plus, Search, SearchIcon, UtensilsCrossed, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -11,11 +11,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import RecipeCard from './recipe-card'
-import RecipeForm from './recipe-form'
+import RecipeForm, { toFormValues } from './recipe-form'
 import DetailDialog from './detail-dialog'
+import { UrlImportDialog, SearchImportDialog, ImportWalkthrough } from './import-dialogs'
+import type { WalkthroughItem } from './import-dialogs'
 import { createRecipe, updateRecipe, deleteRecipe } from '@/lib/recipes/actions'
 import type { RecipeWithIngredients } from '@/lib/recipes/queries'
 import type { RecipeFormValues } from '@/lib/recipes/schema'
@@ -28,8 +37,6 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
   snack: 'Snack',
 }
 
-// Mounts children on the frame after the first paint, letting the dialog
-// open animation complete before the heavy form hooks initialize.
 function DeferredMount({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
@@ -56,6 +63,10 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
   const [cuisineFilter, setCuisineFilter] = useState('')
   const [mealTypeFilter, setMealTypeFilter] = useState<string[]>([])
   const [tagFilter, setTagFilter] = useState('')
+
+  // Import dialog state
+  const [importMode, setImportMode] = useState<'url' | 'search' | null>(null)
+  const [walkthroughItems, setWalkthroughItems] = useState<WalkthroughItem[] | null>(null)
 
   const [isPending, startTransition] = useTransition()
 
@@ -151,15 +162,35 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
     })
   }
 
+
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-heading text-2xl font-semibold">Recipes</h1>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="mr-1.5 size-3.5" />
-          New Recipe
-        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button size="sm" />}>
+            <Plus className="mr-1.5 size-3.5" />
+            Add Recipe
+            <ChevronDown className="ml-1 size-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={openCreate}>
+              <Plus className="size-4" />
+              Enter manually
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setImportMode('url')}>
+              <Link className="size-4" />
+              Paste a URL
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setImportMode('search')}>
+              <SearchIcon className="size-4" />
+              Search the web
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Filters */}
@@ -295,7 +326,7 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
             {activeRecipe && (
               <DeferredMount>
                 <RecipeForm
-                  defaultValues={activeRecipe}
+                  defaultValues={toFormValues(activeRecipe)}
                   onSubmit={handleUpdate}
                   isSubmitting={isPending}
                 />
@@ -312,6 +343,39 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import: URL paste */}
+      <UrlImportDialog
+        open={importMode === 'url'}
+        onOpenChange={(open) => !open && setImportMode(null)}
+        onExtracted={(candidate) => {
+          setImportMode(null)
+          setWalkthroughItems([{ type: 'ready', label: candidate.name, candidate }])
+        }}
+      />
+
+      {/* Import: web search */}
+      <SearchImportDialog
+        open={importMode === 'search'}
+        onOpenChange={(open) => !open && setImportMode(null)}
+        onItems={(items) => {
+          setImportMode(null)
+          setWalkthroughItems(items)
+        }}
+      />
+
+      {/* Import walkthrough */}
+      {walkthroughItems && (
+        <ImportWalkthrough
+          items={walkthroughItems}
+          open={!!walkthroughItems}
+          onOpenChange={(open) => { if (!open) setWalkthroughItems(null) }}
+          onComplete={(count) => {
+            setWalkthroughItems(null)
+            if (count > 0) toast.success(`${count} ${count === 1 ? 'recipe' : 'recipes'} saved`)
+          }}
+        />
+      )}
     </div>
   )
 }

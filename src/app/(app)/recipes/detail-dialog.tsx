@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Clock,
   ExternalLink,
@@ -65,6 +65,15 @@ export default function DetailDialog({
 }: DetailDialogProps) {
   const [imgError, setImgError] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const id = requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: 0 })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open])
 
   if (!recipe) return null
 
@@ -90,6 +99,10 @@ export default function DetailDialog({
         showCloseButton
         className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
       >
+        {/* Focus absorber — Base UI's trap targets the first focusable element in DOM
+            order. Without this, it lands on the source link at the bottom and scrolls there. */}
+        <span tabIndex={0} className="sr-only" aria-hidden="true" />
+
         {/* Image */}
         <div className="relative h-52 w-full shrink-0 overflow-hidden bg-muted">
           {recipe.image_url && !imgError ? (
@@ -107,7 +120,7 @@ export default function DetailDialog({
         </div>
 
         {/* Scrollable body */}
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
+        <div ref={scrollRef} className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="pr-6 text-xl">{recipe.name}</DialogTitle>
 

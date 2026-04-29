@@ -279,6 +279,8 @@ const SortableIngredientRow = memo(function SortableIngredientRow({
         <Input
           type="number"
           placeholder="Qty"
+          step="any"
+          min="0"
           className="w-16"
           {...register(`ingredients.${index}.quantity`)}
         />
@@ -364,12 +366,15 @@ const SortableInstructionRow = memo(function SortableInstructionRow({
 // ---- Main component ---------------------------------------------------------
 
 interface RecipeFormProps {
-  defaultValues?: RecipeWithIngredients
+  defaultValues?: RecipeFormValues
   onSubmit: (data: RecipeFormValues) => Promise<void>
   isSubmitting?: boolean
+  formId?: string
 }
 
-export default function RecipeForm({ defaultValues, onSubmit }: RecipeFormProps) {
+export { toFormValues }
+
+export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-form' }: RecipeFormProps) {
   const {
     register,
     control,
@@ -379,7 +384,7 @@ export default function RecipeForm({ defaultValues, onSubmit }: RecipeFormProps)
     formState: { errors },
   } = useForm<RecipeFormValues>({
     resolver: zodResolver(recipeFormSchema) as Resolver<RecipeFormValues>,
-    defaultValues: defaultValues ? toFormValues(defaultValues) : DEFAULT_VALUES,
+    defaultValues: defaultValues ?? DEFAULT_VALUES,
   })
 
   const {
@@ -450,7 +455,7 @@ export default function RecipeForm({ defaultValues, onSubmit }: RecipeFormProps)
   }
 
   return (
-    <form id="recipe-form" onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
+    <form id={formId} onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
       {/* Basic Info */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
