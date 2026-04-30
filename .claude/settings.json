@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "c:\\Code\\Code_Angelo\\_PERSONAL\\forkcast\\src\\app\\(app)\\plans"
+    ],
+    "allow": [
+      "Bash(npm run *)"
+    ]
+  }
+}
