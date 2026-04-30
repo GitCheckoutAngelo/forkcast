@@ -540,12 +540,15 @@ export default function PlanEditor({
           </div>
 
           {/* Sidebar — desktop only, edit mode only.
-              Kept in DOM during edit→view transition (isEditMode stays true) so it can
-              fade out. modeIsPending drives opacity-0; unmounts only after URL settles. */}
+              self-stretch makes the wrapper as tall as the day grid so the sticky
+              sidebar inside it has a scroll range to work within. Without it the
+              wrapper is only as tall as the sidebar itself (align-self: flex-start
+              from items-start on the parent) and sticky has nowhere to travel.
+              Kept in DOM during edit→view transition so it can fade out. */}
           {isEditMode && (
             <div
               className={cn(
-                'shrink-0 transition-opacity duration-150',
+                'shrink-0 self-stretch transition-opacity duration-150',
                 modeIsPending ? 'pointer-events-none opacity-0' : 'opacity-100',
               )}
             >
