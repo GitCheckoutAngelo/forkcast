@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, GripVertical, Pencil } from 'lucide-react'
+import { ArrowLeft, Check, GripVertical, Loader2, Pencil, ShoppingCart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -126,7 +126,15 @@ function InlineName({
 
 // ── Week summary ─────────────────────────────────────────────────────────────
 
-function WeekSummary({ plan, target }: { plan: MealPlanResolved; target: MacroTarget | null }) {
+function WeekSummary({
+  plan,
+  target,
+  isRefreshing,
+}: {
+  plan: MealPlanResolved
+  target: MacroTarget | null
+  isRefreshing: boolean
+}) {
   const weekTotal = plan.days.reduce(
     (acc, d) => addMacros(acc, d.total_macros),
     ZERO_MACROS
@@ -135,7 +143,11 @@ function WeekSummary({ plan, target }: { plan: MealPlanResolved; target: MacroTa
   const avgProtein = Math.round(weekTotal.protein_g / 7)
 
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+    <div className={cn(
+      'flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground transition-opacity',
+      isRefreshing && 'opacity-50',
+    )}>
+      {isRefreshing && <Loader2 className="size-3 shrink-0 animate-spin" />}
       <span>
         <span className="font-medium text-foreground tabular-nums">
           {weekTotal.calories > 0 ? Math.round(weekTotal.calories).toLocaleString() : '—'}
@@ -340,6 +352,7 @@ export default function PlanEditor({
   // Optimistic toggle state — updated synchronously on click so the segmented
   // control reflects the selection immediately, without waiting for the URL update.
   const [modeIsPending, startModeTransition] = useTransition()
+  const [isRefreshing, startRefreshTransition] = useTransition()
   const [optimisticEditMode, setOptimisticEditMode] = useState(isEditMode)
   // During a transition show the optimistic value; after landing revert to URL truth
   // (this also makes browser back/forward correct without extra syncing).
@@ -451,7 +464,7 @@ export default function PlanEditor({
       setPendingEntries((prev) => prev.filter((p) => p.entry.id !== entry.id))
       toast.error(result.error)
     } else {
-      router.refresh()
+      startRefreshTransition(() => router.refresh())
     }
   }
 
@@ -519,9 +532,19 @@ export default function PlanEditor({
               <p className="text-sm text-muted-foreground">
                 {formatDateRange(plan.start_date, plan.end_date)}
               </p>
-              <WeekSummary plan={plan} target={profile.macro_target} />
+              <WeekSummary plan={plan} target={profile.macro_target} isRefreshing={isRefreshing} />
             </div>
-            <ModeToggle isEditMode={toggleEditMode} onToggle={setMode} />
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href={`/plans/${plan.id}/grocery`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Grocery list"
+              >
+                <ShoppingCart className="size-3.5" />
+                <span className="hidden sm:inline">Grocery list</span>
+              </Link>
+              <ModeToggle isEditMode={toggleEditMode} onToggle={setMode} />
+            </div>
           </div>
         </div>
 

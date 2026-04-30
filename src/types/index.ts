@@ -59,6 +59,11 @@ export interface UserProfile {
    * values for this user must fall on this day. Defaults to Monday.
    */
   week_start_day: WeekStartDay;
+  /**
+   * Ingredients that are always on hand. During grocery list generation the AI
+   * marks fuzzy-matching items as pantry staples, collapsing them at the bottom.
+   */
+  grocery_ignore_list: string[];
   created_at: ISODateTime;
   updated_at: ISODateTime;
   // Future additions to consider as features are built:
@@ -312,4 +317,40 @@ export interface FoodItemCandidate {
   // a USDA entry the AI cited, or "estimate" if the AI inferred them.
   macros_source: 'brand_label' | 'usda' | 'estimate' | 'other';
   macros_source_note: string | null;  // free text, e.g., "from Chobani.com"
+}
+
+// ----- Grocery list ---------------------------------------------------------
+
+/** Which recipe or food item contributed an ingredient to a grocery item. */
+export interface GroceryItemSource {
+  kind: 'recipe' | 'food_item';
+  id: UUID;
+  name: string;
+  contribution: string;  // "1 medium" or "200g chopped"
+}
+
+/**
+ * One line on the grocery list. The `items` JSONB column on grocery_lists
+ * holds an array of these. The `id` is a client-generated UUID used as a
+ * stable React key and for targeted updates within the JSONB array.
+ */
+export interface GroceryItem {
+  id: string;
+  name: string;
+  quantity_text: string;
+  category: string | null;  // "produce" | "dairy" | "pantry" | "protein" | "frozen" | "bakery" | "other"
+  checked: boolean;
+  is_pantry_staple: boolean;  // true → item moves to collapsed "Pantry staples" section
+  sources: GroceryItemSource[];
+  notes: string | null;
+}
+
+/** DB table shape for grocery_lists. */
+export interface GroceryList {
+  id: UUID;
+  meal_plan_id: UUID;
+  generated_at: ISODateTime;
+  items: GroceryItem[];
+  created_at: ISODateTime;
+  updated_at: ISODateTime;
 }

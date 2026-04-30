@@ -25,6 +25,10 @@ const preferencesSchema = z.object({
   timezone: z.string().min(1, 'Timezone is required'),
 })
 
+const groceryIgnoreListSchema = z.array(
+  z.string().trim().min(1).max(100).toLowerCase()
+).max(100, 'List cannot exceed 100 items')
+
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 export async function updateProfile(
@@ -115,5 +119,28 @@ export async function updatePreferences(
   if (error) return { error: error.message }
   revalidatePath('/settings')
   revalidatePath('/plans')
+  return {}
+}
+
+export async function updateGroceryIgnoreList(
+  items: string[]
+): Promise<{ error?: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const parsed = groceryIgnoreListSchema.safeParse(items)
+  if (!parsed.success) return { error: parsed.error.issues[0].message }
+
+  // Deduplicate after normalisation
+  const deduped = [...new Set(parsed.data)]
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ grocery_ignore_list: deduped })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
   return {}
 }

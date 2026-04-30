@@ -275,7 +275,7 @@ export async function getUserProfile(userId: string) {
 
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, display_name, macro_target, week_start_day, timezone')
+    .select('id, display_name, macro_target, week_start_day, timezone, grocery_ignore_list')
     .eq('id', userId)
     .single()
 
@@ -286,5 +286,6 @@ export async function getUserProfile(userId: string) {
     macro_target: MacroTarget | null
     week_start_day: number
     timezone: string
+    grocery_ignore_list: string[]
   }
 }

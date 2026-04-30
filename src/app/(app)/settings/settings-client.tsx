@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { updateProfile, updateMacroTarget, updatePreferences } from '@/lib/profile/actions'
+import { updateProfile, updateMacroTarget, updatePreferences, updateGroceryIgnoreList } from '@/lib/profile/actions'
 import { deleteAllMealPlans } from '@/lib/meal-plans/actions'
 import { logout } from '@/lib/auth/actions'
 import { createClient } from '@/lib/supabase/browser'
@@ -423,6 +423,95 @@ function PreferencesSection({
   )
 }
 
+// ── Grocery ignore list ───────────────────────────────────────────────────────
+
+function GroceryIgnoreListSection({ initialList }: { initialList: string[] }) {
+  const [items, setItems] = useState<string[]>(initialList)
+  const [inputVal, setInputVal] = useState('')
+  const [isPending, startTransition] = useTransition()
+
+  function addItem(raw: string) {
+    const trimmed = raw.trim().toLowerCase()
+    if (!trimmed || items.includes(trimmed)) { setInputVal(''); return }
+    setItems((prev) => [...prev, trimmed])
+    setInputVal('')
+  }
+
+  function removeItem(item: string) {
+    setItems((prev) => prev.filter((i) => i !== item))
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      addItem(inputVal)
+    } else if (e.key === 'Backspace' && inputVal === '' && items.length > 0) {
+      setItems((prev) => prev.slice(0, -1))
+    }
+  }
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await updateGroceryIgnoreList(items)
+      if (result.error) toast.error(result.error)
+      else toast.success('Staples list saved')
+    })
+  }
+
+  return (
+    <Section title="Grocery list — ignored staples">
+      <p className="text-xs text-muted-foreground">
+        These items move to a &ldquo;Pantry staples&rdquo; section at the bottom of grocery lists, collapsed by default. The AI fuzzy-matches ingredient names against this list, so abbreviations and variations are handled automatically.
+      </p>
+
+      <div
+        className="flex min-h-10 flex-wrap gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring cursor-text"
+        onClick={() => document.getElementById('staple-input')?.focus()}
+      >
+        {items.map((item) => (
+          <span
+            key={item}
+            className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground"
+          >
+            {item}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); removeItem(item) }}
+              className="text-muted-foreground hover:text-foreground leading-none"
+              aria-label={`Remove ${item}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          id="staple-input"
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => { if (inputVal.trim()) addItem(inputVal) }}
+          placeholder={items.length === 0 ? 'Type an item and press Enter…' : ''}
+          className="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button onClick={handleSave} disabled={isPending} size="sm">
+          {isPending ? 'Saving…' : 'Save'}
+        </Button>
+        {items.length !== initialList.length || items.some((v, i) => v !== initialList[i]) ? (
+          <button
+            onClick={() => setItems(initialList)}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Reset
+          </button>
+        ) : null}
+      </div>
+    </Section>
+  )
+}
+
 // ── Account ───────────────────────────────────────────────────────────────────
 
 function AccountSection({ email }: { email: string }) {
@@ -529,6 +618,7 @@ interface SettingsClientProps {
     macro_target: MacroTarget | null
     week_start_day: WeekStartDay
     timezone: string
+    grocery_ignore_list: string[]
   }
   planCount: number
 }
@@ -550,6 +640,7 @@ export default function SettingsClient({ profile, planCount }: SettingsClientPro
         timezone={profile.timezone}
         planCount={planCount}
       />
+      <GroceryIgnoreListSection initialList={profile.grocery_ignore_list} />
       <AccountSection email={profile.email} />
     </div>
   )

@@ -21,6 +21,7 @@ export default async function SettingsPage() {
         ...profile,
         email: user.email ?? '',
         week_start_day: profile.week_start_day as WeekStartDay,
+        grocery_ignore_list: profile.grocery_ignore_list ?? [],
       }}
       planCount={planCount ?? 0}
     />
