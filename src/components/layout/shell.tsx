@@ -74,6 +74,7 @@ const navItems = [
   { href: "/recipes", label: "Recipes" },
   { href: "/food-items", label: "Food Items" },
   { href: "/plans", label: "Plans" },
+  { href: "/settings", label: "Settings" },
 ]
 
 // ── Shell ─────────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CalendarDays, ChevronRight, Loader2, Plus, Utensils } from 'lucide-react'
+import { CalendarDays, ChevronRight, Loader2, MoreHorizontal, Plus, Trash2, Utensils } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -13,6 +13,12 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -22,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createMealPlan } from '@/lib/meal-plans/actions'
+import { createMealPlan, deleteMealPlan } from '@/lib/meal-plans/actions'
 import type { MealPlanSummary } from '@/lib/meal-plans/queries'
 import { cn } from '@/lib/utils'
 
@@ -113,7 +119,7 @@ function NewPlanDialog({
             <Label htmlFor="plan-start">Start date</Label>
             <Select value={selectedDate} onValueChange={(v) => { if (v) setSelectedDate(v) }}>
               <SelectTrigger id="plan-start" className="w-full">
-                <SelectValue />
+                <SelectValue>{formatDateLabel(new Date(selectedDate + 'T00:00:00'))}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {validDates.map((d) => {
@@ -164,49 +170,70 @@ function PlanCard({
   isActive,
   isPending,
   onNavigate,
+  onDelete,
 }: {
   plan: MealPlanSummary
   isActive: boolean
   isPending: boolean
   onNavigate: () => void
+  onDelete: () => void
 }) {
   return (
-    <button
-      onClick={onNavigate}
+    <div
       className={cn(
-        'group flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-card px-5 py-4 text-left shadow-sm transition-[colors,opacity] hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'group flex w-full items-center rounded-2xl border border-border bg-card shadow-sm transition-[colors,opacity]',
         isPending && 'pointer-events-none',
         isActive && 'opacity-60',
         isPending && !isActive && 'opacity-40',
       )}
     >
-      <div className="flex min-w-0 flex-col gap-1">
-        <span className="font-heading text-base font-medium text-foreground truncate">
-          {planDisplayName(plan)}
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {formatDateRange(plan.start_date, plan.end_date)}
-        </span>
-        <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Utensils className="size-3" />
-            {plan.total_entries} {plan.total_entries === 1 ? 'entry' : 'entries'}
+      <button
+        onClick={onNavigate}
+        className="flex flex-1 min-w-0 items-center justify-between gap-4 px-5 py-4 text-left hover:bg-muted/50 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="font-heading text-base font-medium text-foreground truncate">
+            {planDisplayName(plan)}
           </span>
-          {plan.avg_daily_calories > 0 && (
+          <span className="text-sm text-muted-foreground">
+            {formatDateRange(plan.start_date, plan.end_date)}
+          </span>
+          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <CalendarDays className="size-3" />
-              avg {plan.avg_daily_calories.toLocaleString()} kcal/day
+              <Utensils className="size-3" />
+              {plan.total_entries} {plan.total_entries === 1 ? 'entry' : 'entries'}
             </span>
-          )}
+            {plan.avg_daily_calories > 0 && (
+              <span className="flex items-center gap-1">
+                <CalendarDays className="size-3" />
+                avg {plan.avg_daily_calories.toLocaleString()} kcal/day
+              </span>
+            )}
+          </div>
         </div>
-      </div>
 
-      {isActive ? (
-        <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
-      ) : (
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-      )}
-    </button>
+        {isActive ? (
+          <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+        ) : (
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        )}
+      </button>
+
+      <div className="flex shrink-0 items-center pr-3">
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button size="icon" variant="ghost" className="size-8 text-muted-foreground" />}>
+            <MoreHorizontal className="size-4" />
+            <span className="sr-only">Plan options</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="bottom" align="end">
+            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
   )
 }
 
@@ -223,10 +250,25 @@ export default function PlansClient({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
+  const [confirmPlan, setConfirmPlan] = useState<MealPlanSummary | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   function handleNavigate(id: string) {
     setActivePlanId(id)
     startTransition(() => { router.push(`/plans/${id}`) })
+  }
+
+  async function handleDelete() {
+    if (!confirmPlan) return
+    setIsDeleting(true)
+    const result = await deleteMealPlan(confirmPlan.id)
+    setIsDeleting(false)
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
+    setConfirmPlan(null)
+    router.refresh()
   }
 
   return (
@@ -271,6 +313,7 @@ export default function PlansClient({
               isActive={activePlanId === plan.id}
               isPending={isPending}
               onNavigate={() => handleNavigate(plan.id)}
+              onDelete={() => setConfirmPlan(plan)}
             />
           ))}
         </div>
@@ -281,6 +324,33 @@ export default function PlansClient({
         onOpenChange={setDialogOpen}
         weekStartDay={weekStartDay}
       />
+
+      <Dialog
+        open={!!confirmPlan}
+        onOpenChange={(v) => { if (!v && !isDeleting) setConfirmPlan(null) }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Delete &ldquo;{confirmPlan ? planDisplayName(confirmPlan) : ''}&rdquo;?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            All meal entries will be permanently removed. This cannot be undone.
+          </p>
+          <DialogFooter className="-mx-6 -mb-6">
+            <DialogClose
+              render={<Button variant="outline" type="button" />}
+              disabled={isDeleting}
+            >
+              Cancel
+            </DialogClose>
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting ? 'Deleting…' : 'Delete plan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

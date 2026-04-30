@@ -16,14 +16,6 @@ import type {
 
 import { ZERO_MACROS, scaleMacros, addMacros } from './utils'
 
-const DEFAULT_TARGET: MacroTarget = {
-  calories: 2000,
-  protein_g: 150,
-  carbs_g: 200,
-  fat_g: 65,
-  tolerance_pct: 5,
-}
-
 function computeStatus(actual: number, target: number, tol: number): 'under' | 'on' | 'over' {
   if (target === 0) return 'on'
   if (actual < target * (1 - tol)) return 'under'
@@ -165,8 +157,8 @@ function resolveDay(d: RawDay, userTarget: MacroTarget | null): PlanDayResolved 
     ZERO_MACROS
   )
 
-  const target = d.macro_target_override ?? userTarget ?? DEFAULT_TARGET
-  const target_status = computeTargetStatus(total_macros, target)
+  const target = d.macro_target_override ?? userTarget ?? null
+  const target_status = target ? computeTargetStatus(total_macros, target) : null
 
   return {
     id: d.id,

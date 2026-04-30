@@ -54,6 +54,19 @@ export async function deleteMealPlan(id: string): Promise<{ error?: string }> {
   return {}
 }
 
+export async function deleteAllMealPlans(): Promise<{ error?: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('meal_plans').delete().eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/plans')
+  revalidatePath('/settings')
+  return {}
+}
+
 export async function addMealEntry(
   slotId: string,
   consumable:

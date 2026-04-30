@@ -92,6 +92,7 @@ function EntryCard({
   const [servingsInput, setServingsInput] = useState(String(entry.servings))
   const [isServingsEditing, setIsServingsEditing] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
+  const isOptimistic = entry.id.startsWith('opt-')
 
   // Sync servingsInput when the server returns an updated entry.servings.
   // React-documented derived-state pattern: track previous prop in state,
@@ -198,7 +199,7 @@ function EntryCard({
           {/* Remove — top-right, hover reveal */}
           <button
             onClick={handleRemove}
-            disabled={isPending}
+            disabled={isPending || isOptimistic}
             className="shrink-0 self-start text-muted-foreground/40 opacity-0 transition-opacity group-hover/entry:opacity-100 hover:text-destructive disabled:pointer-events-none focus:opacity-100 focus:outline-none"
             aria-label={`Remove ${name}`}
           >

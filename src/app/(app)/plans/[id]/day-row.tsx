@@ -39,7 +39,7 @@ function DayRow({
   const dayName = SHORT_DAYS[date.getDay()]
   const dateLabel = `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}`
   const kcal = Math.round(day.total_macros.calories)
-  const calStatus = day.target_status.calories
+  const calStatus = day.target_status?.calories ?? null
 
   return (
     <div className="flex flex-col gap-3 px-4 py-10 lg:flex-row lg:gap-4">
@@ -58,7 +58,7 @@ function DayRow({
               {' · '}{Math.round(day.total_macros.carbs_g)}g C
               {' · '}{Math.round(day.total_macros.fat_g)}g F
             </span>
-            <StatusDot status={calStatus} />
+            {calStatus && <StatusDot status={calStatus} />}
           </div>
         )}
       </div>

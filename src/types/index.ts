@@ -235,14 +235,15 @@ export interface MealSlotResolved extends MealSlot {
 export interface PlanDayResolved extends PlanDay {
   slots: MealSlotResolved[];
   total_macros: Macros;          // sum across slots
-  target: MacroTarget;           // override or user default
-  /** Per-macro status. Useful for the "did I hit my target" UI. */
+  /** null when neither the day nor the user has a macro target set */
+  target: MacroTarget | null;
+  /** null when target is null */
   target_status: {
     calories: 'under' | 'on' | 'over';
     protein_g: 'under' | 'on' | 'over';
     carbs_g: 'under' | 'on' | 'over';
     fat_g: 'under' | 'on' | 'over';
-  };
+  } | null;
 }
 
 export interface MealPlanResolved extends MealPlan {
