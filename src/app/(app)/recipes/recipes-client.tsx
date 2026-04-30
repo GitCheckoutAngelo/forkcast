@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronDown, Link, Plus, Search, SearchIcon, UtensilsCrossed, X } from 'lucide-react'
 import {
@@ -49,14 +49,11 @@ interface RecipesClientProps {
 
 export default function RecipesClient({ recipes }: RecipesClientProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
-  const dialog = searchParams.get('dialog') as 'create' | 'detail' | 'edit' | null
-  const activeId = searchParams.get('id')
-  const activeRecipe = useMemo(
-    () => recipes.find((r) => r.id === activeId) ?? null,
-    [recipes, activeId],
-  )
+  // Dialog state — local so open/close is synchronous (no navigation round-trip).
+  const [dialog, setDialog] = useState<'create' | 'detail' | 'edit' | null>(null)
+  // Keep activeRecipe alive through close animations (don't null it on close).
+  const [activeRecipe, setActiveRecipe] = useState<RecipeWithIngredients | null>(null)
 
   // Filter state
   const [search, setSearch] = useState('')
@@ -70,11 +67,11 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
 
   const [isPending, startTransition] = useTransition()
 
-  // Navigation helpers
-  function openCreate() { router.push('?dialog=create') }
-  function openDetail(id: string) { router.push(`?dialog=detail&id=${id}`) }
-  function openEdit(id: string) { router.push(`?dialog=edit&id=${id}`) }
-  function closeDialog() { router.push('/recipes') }
+  // Dialog helpers
+  function openCreate() { setDialog('create') }
+  function openDetail(recipe: RecipeWithIngredients) { setActiveRecipe(recipe); setDialog('detail') }
+  function openEdit(recipe: RecipeWithIngredients) { setActiveRecipe(recipe); setDialog('edit') }
+  function closeDialog() { setDialog(null) }
 
   // Filtered recipes
   const filtered = useMemo(() => {
@@ -118,7 +115,7 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
     )
   }
 
-  // Server action handlers
+  // Server action handlers — close dialog immediately, then refresh data in background.
   function handleCreate(data: RecipeFormValues) {
     return new Promise<void>((resolve) => {
       startTransition(async () => {
@@ -128,6 +125,7 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
         } else {
           toast.success('Recipe created')
           closeDialog()
+          router.refresh()
         }
         resolve()
       })
@@ -135,15 +133,16 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
   }
 
   function handleUpdate(data: RecipeFormValues) {
-    if (!activeId) return Promise.resolve()
+    if (!activeRecipe) return Promise.resolve()
     return new Promise<void>((resolve) => {
       startTransition(async () => {
-        const result = await updateRecipe(activeId, data)
+        const result = await updateRecipe(activeRecipe.id, data)
         if (result.error) {
           toast.error(result.error)
         } else {
           toast.success('Recipe updated')
           closeDialog()
+          router.refresh()
         }
         resolve()
       })
@@ -158,6 +157,7 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
       } else {
         toast.success('Recipe deleted')
         closeDialog()
+        router.refresh()
       }
     })
   }
@@ -255,8 +255,8 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
             <RecipeCard
               key={recipe.id}
               recipe={recipe}
-              onView={() => openDetail(recipe.id)}
-              onEdit={() => openEdit(recipe.id)}
+              onView={() => openDetail(recipe)}
+              onEdit={() => openEdit(recipe)}
               onDelete={() => handleDelete(recipe.id)}
             />
           ))}
@@ -309,8 +309,8 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
         recipe={activeRecipe}
         open={dialog === 'detail'}
         onOpenChange={(open) => !open && closeDialog()}
-        onEdit={() => activeId && openEdit(activeId)}
-        onDelete={() => activeId && handleDelete(activeId)}
+        onEdit={() => activeRecipe && openEdit(activeRecipe)}
+        onDelete={() => activeRecipe && handleDelete(activeRecipe.id)}
       />
 
       {/* Edit dialog */}
@@ -323,7 +323,7 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
             <DialogTitle>Edit Recipe</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-            {activeRecipe && (
+            {activeRecipe && dialog === 'edit' && (
               <DeferredMount>
                 <RecipeForm
                   defaultValues={toFormValues(activeRecipe)}

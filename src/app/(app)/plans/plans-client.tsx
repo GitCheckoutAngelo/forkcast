@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CalendarDays, ChevronRight, Plus, Utensils } from 'lucide-react'
+import { CalendarDays, ChevronRight, Loader2, Plus, Utensils } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { createMealPlan } from '@/lib/meal-plans/actions'
 import type { MealPlanSummary } from '@/lib/meal-plans/queries'
+import { cn } from '@/lib/utils'
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -158,13 +159,26 @@ function NewPlanDialog({
 
 // ── Plan card ────────────────────────────────────────────────────────────────
 
-function PlanCard({ plan }: { plan: MealPlanSummary }) {
-  const router = useRouter()
-
+function PlanCard({
+  plan,
+  isActive,
+  isPending,
+  onNavigate,
+}: {
+  plan: MealPlanSummary
+  isActive: boolean
+  isPending: boolean
+  onNavigate: () => void
+}) {
   return (
     <button
-      onClick={() => router.push(`/plans/${plan.id}`)}
-      className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-card px-5 py-4 text-left shadow-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      onClick={onNavigate}
+      className={cn(
+        'group flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-card px-5 py-4 text-left shadow-sm transition-[colors,opacity] hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        isPending && 'pointer-events-none',
+        isActive && 'opacity-60',
+        isPending && !isActive && 'opacity-40',
+      )}
     >
       <div className="flex min-w-0 flex-col gap-1">
         <span className="font-heading text-base font-medium text-foreground truncate">
@@ -187,7 +201,11 @@ function PlanCard({ plan }: { plan: MealPlanSummary }) {
         </div>
       </div>
 
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      {isActive ? (
+        <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+      ) : (
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      )}
     </button>
   )
 }
@@ -201,7 +219,15 @@ export default function PlansClient({
   plans: MealPlanSummary[]
   weekStartDay: number
 }) {
+  const router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [activePlanId, setActivePlanId] = useState<string | null>(null)
+
+  function handleNavigate(id: string) {
+    setActivePlanId(id)
+    startTransition(() => { router.push(`/plans/${id}`) })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -237,9 +263,15 @@ export default function PlansClient({
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className={cn('flex flex-col gap-3', isPending && 'cursor-wait')}>
           {plans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} />
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              isActive={activePlanId === plan.id}
+              isPending={isPending}
+              onNavigate={() => handleNavigate(plan.id)}
+            />
           ))}
         </div>
       )}

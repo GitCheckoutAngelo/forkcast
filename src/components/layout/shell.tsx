@@ -1,7 +1,8 @@
 "use client"
 
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { logout } from "@/lib/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -16,12 +17,66 @@ import {
 import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+// ── Nav progress bar ─────────────────────────────────────────────────────────
+// Shows after a 150ms delay so fast navigations don't flash a bar at all.
+// Phases: idle → start (width 0, no transition) → running (width 85%, slow
+// ease-out) → done (width 100%, fade out) → idle.
+
+type BarPhase = 'idle' | 'start' | 'running' | 'done'
+
+function NavProgressBar({ isPending }: { isPending: boolean }) {
+  const [phase, setPhase] = useState<BarPhase>('idle')
+  const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (isPending) {
+      delayRef.current = setTimeout(() => setPhase('start'), 150)
+      return () => {
+        if (delayRef.current) clearTimeout(delayRef.current)
+      }
+    }
+    // Navigation complete — cancel delay if it hasn't fired yet
+    if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null }
+    setPhase((prev) => (prev === 'idle' || prev === 'start') ? 'idle' : 'done')
+  }, [isPending])
+
+  // Double rAF: let 'start' commit at w-0, then trigger the width transition.
+  useEffect(() => {
+    if (phase !== 'start') return
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setPhase('running'))
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [phase])
+
+  if (phase === 'idle') return null
+
+  return (
+    <div
+      aria-hidden
+      onTransitionEnd={(e) => {
+        if (phase === 'done' && e.propertyName === 'opacity') setPhase('idle')
+      }}
+      className={cn(
+        'pointer-events-none fixed left-0 top-0 z-[100] h-[2px] bg-primary',
+        phase === 'start'   && 'w-0',
+        phase === 'running' && 'w-[85%] transition-[width] duration-[5s] ease-out',
+        phase === 'done'    && 'w-full opacity-0 transition-[width,opacity] duration-150',
+      )}
+    />
+  )
+}
+
+// ── Nav items ─────────────────────────────────────────────────────────────────
+
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/recipes", label: "Recipes" },
   { href: "/food-items", label: "Food Items" },
   { href: "/plans", label: "Plans" },
 ]
+
+// ── Shell ─────────────────────────────────────────────────────────────────────
 
 export default function Shell({
   children,
@@ -31,10 +86,31 @@ export default function Shell({
   userEmail: string | null
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [intendedPath, setIntendedPath] = useState<string | null>(null)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Clear intended path once the navigation settles so active state
+  // derives from the real pathname again.
+  useEffect(() => {
+    if (!isPending) setIntendedPath(null)
+  }, [isPending])
+
+  function handleNav(href: string) {
+    setIntendedPath(href)
+    setMobileOpen(false)
+    startTransition(() => { router.push(href) })
+  }
+
+  // Optimistic active: if navigation is in-flight, highlight the intended route.
+  const effectivePath = intendedPath ?? pathname
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="border-b border-border bg-background/95 backdrop-blur-sm">
+      <NavProgressBar isPending={isPending} />
+
+      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-xl font-semibold tracking-tight text-foreground font-heading sm:text-2xl">
@@ -42,11 +118,11 @@ export default function Shell({
             </Link>
             <nav className="hidden items-center gap-3 md:flex">
               {navItems.map((item) => {
-                const active = item.href === "/" ? pathname === item.href : pathname?.startsWith(item.href)
+                const active = item.href === "/" ? effectivePath === item.href : effectivePath?.startsWith(item.href)
                 return (
-                  <Link
+                  <button
                     key={item.href}
-                    href={item.href}
+                    onClick={() => handleNav(item.href)}
                     className={cn(
                       "rounded-full px-3 py-2 text-sm font-medium transition-all",
                       active
@@ -55,7 +131,7 @@ export default function Shell({
                     )}
                   >
                     {item.label}
-                  </Link>
+                  </button>
                 )
               })}
             </nav>
@@ -71,7 +147,7 @@ export default function Shell({
           </div>
 
           <div className="md:hidden">
-            <Sheet>
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger render={<Button size="icon" variant="ghost" />}>
                 <Menu className="size-4" />
                 <span className="sr-only">Open menu</span>
@@ -89,20 +165,20 @@ export default function Shell({
                 </SheetHeader>
                 <div className="space-y-3 px-4">
                   {navItems.map((item) => {
-                    const active = item.href === "/" ? pathname === item.href : pathname?.startsWith(item.href)
+                    const active = item.href === "/" ? effectivePath === item.href : effectivePath?.startsWith(item.href)
                     return (
-                      <Link
+                      <button
                         key={item.href}
-                        href={item.href}
+                        onClick={() => handleNav(item.href)}
                         className={cn(
-                          "block rounded-3xl px-4 py-4 text-base font-medium transition-colors",
+                          "block w-full rounded-3xl px-4 py-4 text-left text-base font-medium transition-colors",
                           active
                             ? "bg-primary/10 text-primary"
                             : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                       >
                         {item.label}
-                      </Link>
+                      </button>
                     )
                   })}
                 </div>
@@ -123,6 +199,7 @@ export default function Shell({
           </div>
         </div>
       </div>
+
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
         {children}
       </main>

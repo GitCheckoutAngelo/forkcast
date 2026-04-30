@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronDown, Plus, Search, SearchIcon, ShoppingBasket, X } from 'lucide-react'
 import {
@@ -67,14 +67,11 @@ interface FoodItemsClientProps {
 
 export default function FoodItemsClient({ items }: FoodItemsClientProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
-  const dialog = searchParams.get('dialog') as 'create' | 'detail' | 'edit' | null
-  const activeId = searchParams.get('id')
-  const activeItem = useMemo(
-    () => items.find((i) => i.id === activeId) ?? null,
-    [items, activeId],
-  )
+  // Dialog state — local so open/close is synchronous (no navigation round-trip).
+  const [dialog, setDialog] = useState<'create' | 'detail' | 'edit' | null>(null)
+  // Keep activeItem alive through close animations (don't null it on close).
+  const [activeItem, setActiveItem] = useState<FoodItem | null>(null)
 
   const [search, setSearch] = useState('')
   const [unitFilter, setUnitFilter] = useState('all')
@@ -83,12 +80,12 @@ export default function FoodItemsClient({ items }: FoodItemsClientProps) {
   const [isPending, startTransition] = useTransition()
 
   function openCreate(defaults?: FoodItemFormValues) {
-    if (defaults) setCreateDefaultValues(defaults)
-    router.push('?dialog=create')
+    setCreateDefaultValues(defaults ?? null)
+    setDialog('create')
   }
-  function openDetail(id: string) { router.push(`?dialog=detail&id=${id}`) }
-  function openEdit(id: string) { router.push(`?dialog=edit&id=${id}`) }
-  function closeDialog() { router.push('/food-items') }
+  function openDetail(item: FoodItem) { setActiveItem(item); setDialog('detail') }
+  function openEdit(item: FoodItem) { setActiveItem(item); setDialog('edit') }
+  function closeDialog() { setDialog(null) }
 
   function handleCreateDialogChange(open: boolean) {
     if (!open) {
@@ -130,6 +127,7 @@ export default function FoodItemsClient({ items }: FoodItemsClientProps) {
           toast.success('Food item created')
           closeDialog()
           setCreateDefaultValues(null)
+          router.refresh()
         }
         resolve()
       })
@@ -137,15 +135,16 @@ export default function FoodItemsClient({ items }: FoodItemsClientProps) {
   }
 
   function handleUpdate(data: FoodItemFormValues) {
-    if (!activeId) return Promise.resolve()
+    if (!activeItem) return Promise.resolve()
     return new Promise<void>((resolve) => {
       startTransition(async () => {
-        const result = await updateFoodItem(activeId, data)
+        const result = await updateFoodItem(activeItem.id, data)
         if (result.error) {
           toast.error(result.error)
         } else {
           toast.success('Food item updated')
           closeDialog()
+          router.refresh()
         }
         resolve()
       })
@@ -160,6 +159,7 @@ export default function FoodItemsClient({ items }: FoodItemsClientProps) {
       } else {
         toast.success('Food item deleted')
         closeDialog()
+        router.refresh()
       }
     })
   }
@@ -240,8 +240,8 @@ export default function FoodItemsClient({ items }: FoodItemsClientProps) {
             <FoodItemCard
               key={item.id}
               item={item}
-              onView={() => openDetail(item.id)}
-              onEdit={() => openEdit(item.id)}
+              onView={() => openDetail(item)}
+              onEdit={() => openEdit(item)}
               onDelete={() => handleDelete(item.id)}
             />
           ))}
@@ -304,8 +304,8 @@ export default function FoodItemsClient({ items }: FoodItemsClientProps) {
         item={activeItem}
         open={dialog === 'detail'}
         onOpenChange={(open) => !open && closeDialog()}
-        onEdit={() => activeId && openEdit(activeId)}
-        onDelete={() => activeId && handleDelete(activeId)}
+        onEdit={() => activeItem && openEdit(activeItem)}
+        onDelete={() => activeItem && handleDelete(activeItem.id)}
       />
 
       {/* Edit dialog */}
@@ -318,7 +318,7 @@ export default function FoodItemsClient({ items }: FoodItemsClientProps) {
             <DialogTitle>Edit Food Item</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-            {activeItem && (
+            {activeItem && dialog === 'edit' && (
               <DeferredMount>
                 <FoodItemForm
                   defaultValues={toFormValues(activeItem)}
