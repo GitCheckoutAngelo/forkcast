@@ -375,7 +375,19 @@ function RegenerateDialog({ open, onOpenChange, onConfirm, isPending }: {
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
-function EmptyState({ isGenerating, onGenerate }: { isGenerating: boolean; onGenerate: () => void }) {
+function GeneratingState() {
+  return (
+    <div className="flex flex-col items-center gap-3 py-20 text-center">
+      <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium text-foreground">Generating grocery list…</p>
+        <p className="text-xs text-muted-foreground">Usually takes 5–15 seconds</p>
+      </div>
+    </div>
+  )
+}
+
+function EmptyState({ onGenerate }: { onGenerate: () => void }) {
   return (
     <div className="flex flex-col items-center gap-4 py-20 text-center">
       <div className="rounded-full bg-muted p-4">
@@ -387,10 +399,7 @@ function EmptyState({ isGenerating, onGenerate }: { isGenerating: boolean; onGen
           Claude will group and aggregate ingredients from this week&apos;s meals automatically.
         </p>
       </div>
-      <Button onClick={onGenerate} disabled={isGenerating}>
-        {isGenerating ? <><Loader2 className="size-4 animate-spin" />Generating…</> : 'Generate grocery list'}
-      </Button>
-      {isGenerating && <p className="text-xs text-muted-foreground">Usually takes 5–15 seconds</p>}
+      <Button onClick={onGenerate}>Generate grocery list</Button>
     </div>
   )
 }
@@ -517,8 +526,10 @@ export default function GroceryListClient({
       </div>
 
       {/* Body */}
-      {!list ? (
-        <EmptyState isGenerating={isGenerating} onGenerate={generate} />
+      {isGenerating ? (
+        <GeneratingState />
+      ) : !list ? (
+        <EmptyState onGenerate={generate} />
       ) : list.items.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
           This plan has no meal entries — add some meals, then regenerate.
