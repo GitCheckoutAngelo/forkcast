@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth/current-user'
 import { getMealPlan, getUserProfile } from '@/lib/meal-plans/queries'
 import { listRecipes } from '@/lib/recipes/queries'
 import { listFoodItems } from '@/lib/food-items/queries'
+import { listGroceryTrips } from '@/lib/grocery-lists/queries'
 import PlanEditor from './plan-editor'
 
 interface Props {
@@ -16,10 +17,11 @@ export default async function PlanEditorPage({ params }: Props) {
 
   const profile = await getUserProfile(user.id)
 
-  const [plan, recipes, foodItems] = await Promise.all([
+  const [plan, recipes, foodItems, trips] = await Promise.all([
     getMealPlan(id, profile.macro_target),
     listRecipes(),
     listFoodItems(),
+    listGroceryTrips(id),
   ])
 
   if (!plan) notFound()
@@ -30,6 +32,7 @@ export default async function PlanEditorPage({ params }: Props) {
       profile={profile}
       recipes={recipes}
       foodItems={foodItems}
+      initialTrips={trips}
     />
   )
 }

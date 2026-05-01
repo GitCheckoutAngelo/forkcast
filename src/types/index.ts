@@ -345,12 +345,20 @@ export interface GroceryItem {
   notes: string | null;
 }
 
-/** DB table shape for grocery_lists. */
+/** DB table shape for grocery_lists. One row = one shopping trip. */
 export interface GroceryList {
   id: UUID;
   meal_plan_id: UUID;
+  /** Date range this trip covers. Together with meal_plan_id, start_date is unique. */
+  start_date: ISODate;
+  end_date: ISODate;
+  /** User-set name; null means the UI shows an auto-generated label. */
+  name: string | null;
   generated_at: ISODateTime;
   items: GroceryItem[];
   created_at: ISODateTime;
   updated_at: ISODateTime;
+  /** Computed by listGroceryTrips — not a DB column. True when a meal entry in
+   *  this trip's date range was updated after generated_at. */
+  is_stale?: boolean;
 }

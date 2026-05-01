@@ -126,6 +126,12 @@ When a user signs up via Supabase Auth, a `user_profiles` row must be created to
 - **Component primitives:** the project uses a `@base-ui/react`-based shadcn variant, not the Radix-based default. All UI primitives (Button, Input, Dialog, Sheet, Select, Tabs, etc.) are consistent within this variant. Don't introduce Radix primitives — use the existing `@base-ui/react` ones.
 - **Server actions:** all server actions live under `src/lib/[domain]/actions.ts`. No actions in `src/app/`. Current: `src/lib/auth/actions.ts`.
 - **Auth user fetching:** use `getCurrentUser()` from `src/lib/auth/current-user.ts` instead of calling `supabase.auth.getUser()` directly. It deduplicates within a render pass via `React.cache`.
+- **Responsive UI transitions.** Every navigation, mode toggle, or URL-param-driven view change must use `useTransition` so the triggering control updates synchronously while the destination content loads. The pattern:
+  1. Wrap `router.push` (or the equivalent state update) in `startTransition`.
+  2. Maintain a parallel piece of optimistic state that is set *before* the transition starts (synchronously on click). Compute the displayed active state as `isPending ? optimisticValue : serverDerivedValue` so the control reflects the click immediately.
+  3. While `isPending` is true, show a subtle loading indicator (skeleton or spinner) on the **destination content area only** — not on the control that was clicked. The control stays fully interactive so the user can switch again.
+  4. Use a 150 ms `setTimeout` before revealing the skeleton to avoid flashing on fast transitions. Clear the timeout and hide the skeleton as soon as `isPending` becomes false.
+  - Applied to: top nav, view/edit mode toggle, meal plan card clicks, trip tab switching on the grocery page. Apply to any new navigation or view-state change without being asked.
 
 ## Common tasks
 

@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, GripVertical, Loader2, Pencil, ShoppingCart } from 'lucide-react'
+import { ArrowLeft, Check, GripVertical, Loader2, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -22,8 +22,9 @@ import AddEntryDialog from './add-entry-dialog'
 import RecipeSidebar from './recipe-sidebar'
 import { updateMealPlan, addMealEntry } from '@/lib/meal-plans/actions'
 import { addMacros, ZERO_MACROS } from '@/lib/meal-plans/utils'
-import type { MealPlanResolved, MealEntryResolved, MacroTarget, Recipe, FoodItem } from '@/types'
+import type { MealPlanResolved, MealEntryResolved, MacroTarget, Recipe, FoodItem, GroceryList } from '@/types'
 import Link from 'next/link'
+import TripStrip from './trip-strip'
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -188,28 +189,33 @@ function ModeToggle({
 }) {
   return (
     <div className="flex shrink-0 items-center rounded-lg border border-border bg-muted p-0.5 text-sm">
-      <button
-        onClick={() => onToggle('view')}
-        className={cn(
-          'rounded-md px-3 py-1 font-medium transition-colors',
-          !isEditMode
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        )}
-      >
-        View
-      </button>
-      <button
-        onClick={() => onToggle('edit')}
-        className={cn(
-          'rounded-md px-3 py-1 font-medium transition-colors',
-          isEditMode
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        )}
-      >
-        Edit
-      </button>
+      {/* Inner wrapper is the pill's reference frame — its width = both buttons */}
+      <div className="relative flex">
+        <div
+          className={cn(
+            'absolute inset-0 w-1/2 rounded-md bg-background shadow-sm transition-transform duration-200 ease-in-out',
+            isEditMode ? 'translate-x-full' : 'translate-x-0',
+          )}
+        />
+        <button
+          onClick={() => onToggle('view')}
+          className={cn(
+            'relative z-10 px-3 py-1 font-medium transition-colors duration-200',
+            !isEditMode ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          View
+        </button>
+        <button
+          onClick={() => onToggle('edit')}
+          className={cn(
+            'relative z-10 px-3 py-1 font-medium transition-colors duration-200',
+            isEditMode ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Edit
+        </button>
+      </div>
     </div>
   )
 }
@@ -332,6 +338,7 @@ export default function PlanEditor({
   profile,
   recipes,
   foodItems,
+  initialTrips,
 }: {
   plan: MealPlanResolved
   profile: {
@@ -343,6 +350,7 @@ export default function PlanEditor({
   }
   recipes: Recipe[]
   foodItems: FoodItem[]
+  initialTrips: GroceryList[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -535,18 +543,13 @@ export default function PlanEditor({
               <WeekSummary plan={plan} target={profile.macro_target} isRefreshing={isRefreshing} />
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Link
-                href={`/plans/${plan.id}/grocery`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Grocery list"
-              >
-                <ShoppingCart className="size-3.5" />
-                <span className="hidden sm:inline">Grocery list</span>
-              </Link>
               <ModeToggle isEditMode={toggleEditMode} onToggle={setMode} />
             </div>
           </div>
         </div>
+
+        {/* Trip shopping strip — sticky, sits between the header and the day grid */}
+        <TripStrip plan={plan} planId={plan.id} initialTrips={initialTrips} />
 
         {/* Grid + sidebar */}
         <div className="flex items-start gap-4">

@@ -49,6 +49,8 @@
 }
 
 :root {
+  --nav-height: 4rem; /* matches shell nav py-4 + content height */
+  --strip-height: 6.75rem; /* trip strip sticky height (py-3 + card p-4 + day cells) */
   color-scheme: light;
   --background: oklch(0.97 0.03 90);
   --foreground: oklch(0.18 0.08 36);

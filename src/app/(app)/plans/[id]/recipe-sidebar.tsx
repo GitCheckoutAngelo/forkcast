@@ -92,10 +92,13 @@ export default function RecipeSidebar({
   return (
     <div
       className={cn(
-        'hidden lg:flex shrink-0 flex-col sticky top-4 overflow-hidden border-l border-border transition-all duration-200',
-        'max-h-[calc(100vh-2rem)]',
+        'hidden lg:flex shrink-0 flex-col sticky overflow-hidden border-l border-border transition-all duration-200',
         isOpen ? 'w-64' : 'w-10'
       )}
+      style={{
+        top: 'calc(var(--nav-height) + var(--strip-height) + 0.75rem)',
+        maxHeight: 'calc(100vh - var(--nav-height) - var(--strip-height) - 1.5rem)',
+      }}
     >
       {/* Toggle button — fills height when collapsed so icon stays vertically centred */}
       <button

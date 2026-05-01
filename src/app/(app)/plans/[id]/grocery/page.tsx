@@ -1,17 +1,19 @@
 import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/current-user'
-import { getUserProfile } from '@/lib/meal-plans/queries'
 import { createClient } from '@/lib/supabase/server'
-import { getGroceryList } from '@/lib/grocery-lists/queries'
+import { listGroceryTrips } from '@/lib/grocery-lists/queries'
 import GroceryListClient from './grocery-list-client'
 import type { MealPlan } from '@/types'
 
 interface Props {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ trip?: string; generate?: string }>
 }
 
-export default async function GroceryListPage({ params }: Props) {
+export default async function GroceryListPage({ params, searchParams }: Props) {
   const { id } = await params
+  const { trip: tripParam, generate } = await searchParams
+
   const user = await getCurrentUser()
   if (!user) return null
 
@@ -25,12 +27,18 @@ export default async function GroceryListPage({ params }: Props) {
   if (error || !planData) notFound()
 
   const plan = planData as unknown as Pick<MealPlan, 'id' | 'name' | 'start_date' | 'end_date'>
-  const groceryList = await getGroceryList(id)
+  const trips = await listGroceryTrips(id)
+
+  // Resolve selected trip: prefer the URL param, fallback to first trip
+  const selectedTrip =
+    trips.find((t) => t.id === tripParam) ?? trips[0] ?? null
 
   return (
     <GroceryListClient
       plan={plan}
-      initialList={groceryList}
+      trips={trips}
+      selectedTrip={selectedTrip}
+      autoGenerate={generate === '1'}
     />
   )
 }

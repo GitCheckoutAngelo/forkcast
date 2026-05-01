@@ -65,15 +65,18 @@ type RawRecipe = { id: string; name: string; servings: number; ingredients: RawI
 type RawFoodItem = { id: string; name: string; brand: string | null; serving_size: number; serving_unit: string }
 type RawEntry = { servings: number; recipe_id: string | null; food_item_id: string | null; recipe: RawRecipe | null; food_item: RawFoodItem | null }
 type RawSlot = { entries: RawEntry[] }
-type RawDay = { slots: RawSlot[] }
+type RawDay = { date: string; slots: RawSlot[] }
 type RawPlan = { id: string; name: string | null; start_date: string; end_date: string; days: RawDay[] }
 
 // ── Build contributions ───────────────────────────────────────────────────────
 
-function buildContributions(plan: RawPlan): Contribution[] {
+function buildContributions(plan: RawPlan, startDate: string, endDate: string): Contribution[] {
   const contributions: Contribution[] = []
 
   for (const day of plan.days) {
+    // Filter to only days within the requested trip date range
+    if (day.date < startDate || day.date > endDate) continue
+
     for (const slot of day.slots) {
       for (const entry of slot.entries) {
         if (entry.recipe && entry.recipe.ingredients.length > 0) {
@@ -196,9 +199,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { meal_plan_id } = await req.json()
+    const body = await req.json()
+    const { meal_plan_id, start_date, end_date } = body as {
+      meal_plan_id?: string
+      start_date?: string
+      end_date?: string
+    }
+
     if (!meal_plan_id || typeof meal_plan_id !== 'string') {
       return NextResponse.json({ error: 'meal_plan_id is required' }, { status: 400 })
+    }
+    if (!start_date || !end_date) {
+      return NextResponse.json({ error: 'start_date and end_date are required' }, { status: 400 })
     }
 
     const supabase = await createClient()
@@ -208,6 +220,7 @@ export async function POST(req: Request) {
       .select(`
         id, name, start_date, end_date,
         days:plan_days (
+          date,
           slots:meal_slots (
             entries:meal_entries (
               servings, recipe_id, food_item_id,
@@ -243,14 +256,20 @@ export async function POST(req: Request) {
     const ignoreList: string[] = profileData?.grocery_ignore_list ?? []
 
     const plan = planData as unknown as RawPlan
-    const contributions = buildContributions(plan)
+    const contributions = buildContributions(plan, start_date, end_date)
 
     if (contributions.length === 0) {
       const { data, error } = await supabase
         .from('grocery_lists')
         .upsert(
-          { meal_plan_id, items: [], generated_at: new Date().toISOString() },
-          { onConflict: 'meal_plan_id' }
+          {
+            meal_plan_id,
+            start_date,
+            end_date,
+            items: [],
+            generated_at: new Date().toISOString(),
+          },
+          { onConflict: 'meal_plan_id,start_date' }
         )
         .select()
         .single()
@@ -264,8 +283,14 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from('grocery_lists')
       .upsert(
-        { meal_plan_id, items, generated_at: new Date().toISOString() },
-        { onConflict: 'meal_plan_id' }
+        {
+          meal_plan_id,
+          start_date,
+          end_date,
+          items,
+          generated_at: new Date().toISOString(),
+        },
+        { onConflict: 'meal_plan_id,start_date' }
       )
       .select()
       .single()

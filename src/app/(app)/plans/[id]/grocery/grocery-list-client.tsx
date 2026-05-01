@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ArrowLeft, ChevronDown, Loader2, Pencil, Plus, RefreshCw, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Loader2, Pencil, Plus, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -26,6 +26,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   produce: 'Produce', protein: 'Protein', dairy: 'Dairy',
   bakery: 'Bakery', pantry: 'Pantry', frozen: 'Frozen', other: 'Other',
 }
+
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -99,7 +100,6 @@ function ItemRow({
     const changed = fields.name !== item.name || fields.quantity_text !== item.quantity_text || fields.notes !== item.notes
     if (!changed) return
     onUpdate(item.id, fields)
-    // Fire-and-forget: optimistic update already applied via onUpdate
     updateGroceryItem(listId, item.id, fields).then((r) => {
       if (r.error) toast.error(r.error)
     })
@@ -146,7 +146,6 @@ function ItemRow({
             />
           </div>
         ) : (
-          /* Main row — click toggles sources if they exist */
           <button
             onClick={() => item.sources.length > 0 && setSourcesOpen((v) => !v)}
             className={cn(
@@ -171,7 +170,6 @@ function ItemRow({
           </button>
         )}
 
-        {/* Row-end controls */}
         {!editing && (
           <div className="flex shrink-0 items-center gap-0.5 pr-1">
             {item.sources.length > 0 && (
@@ -194,7 +192,6 @@ function ItemRow({
         )}
       </div>
 
-      {/* Sources footnote */}
       {sourcesOpen && !editing && item.sources.length > 0 && (
         <p className="pb-1 pl-[52px] pr-2 text-xs leading-relaxed text-muted-foreground">
           {item.sources.map((s, i) => (
@@ -207,7 +204,6 @@ function ItemRow({
         </p>
       )}
 
-      {/* Notes line */}
       {hasNotes && (
         <p className="pb-1 pl-[52px] text-xs italic text-muted-foreground/70">{item.notes}</p>
       )}
@@ -218,11 +214,7 @@ function ItemRow({
 // ── Category section ──────────────────────────────────────────────────────────
 
 function CategorySection({
-  category,
-  items,
-  listId,
-  onToggle,
-  onUpdate,
+  category, items, listId, onToggle, onUpdate,
 }: {
   category: string | null
   items: GroceryItem[]
@@ -247,10 +239,7 @@ function CategorySection({
 // ── Pantry staples section ────────────────────────────────────────────────────
 
 function PantryStaplesSection({
-  items,
-  listId,
-  onToggle,
-  onUpdate,
+  items, listId, onToggle, onUpdate,
 }: {
   items: GroceryItem[]
   listId: string
@@ -358,7 +347,7 @@ function RegenerateDialog({ open, onOpenChange, onConfirm, isPending }: {
         <DialogHeader>
           <DialogTitle>Regenerate grocery list?</DialogTitle>
           <DialogDescription>
-            This will replace your current list and lose any custom items or notes you&apos;ve added.
+            This will replace the current list and lose any custom items or notes you&apos;ve added.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -373,7 +362,7 @@ function RegenerateDialog({ open, onOpenChange, onConfirm, isPending }: {
   )
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
+// ── Empty / loading states ────────────────────────────────────────────────────
 
 function GeneratingState() {
   return (
@@ -396,7 +385,7 @@ function EmptyState({ onGenerate }: { onGenerate: () => void }) {
       <div className="flex flex-col gap-1">
         <p className="font-heading text-lg font-medium">No grocery list yet</p>
         <p className="max-w-xs text-sm text-muted-foreground">
-          Claude will group and aggregate ingredients from this week&apos;s meals automatically.
+          Claude will group and aggregate ingredients from this trip&apos;s meals automatically.
         </p>
       </div>
       <Button onClick={onGenerate}>Generate grocery list</Button>
@@ -404,25 +393,106 @@ function EmptyState({ onGenerate }: { onGenerate: () => void }) {
   )
 }
 
-// ── Main client component ─────────────────────────────────────────────────────
+// ── Trip tab selector ─────────────────────────────────────────────────────────
 
-export default function GroceryListClient({
+function TripTabs({
+  trips,
+  activeId,
+  onSelect,
+}: {
+  trips: GroceryList[]
+  activeId: string | null
+  onSelect: (tripId: string) => void
+}) {
+  if (trips.length <= 1) return null
+
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {trips.map((trip, i) => {
+        const isActive = trip.id === activeId
+        const label = trip.name ?? `Trip ${i + 1}` // i kept for label numbering
+        return (
+          <button
+            key={trip.id}
+            onClick={() => onSelect(trip.id)}
+            className={cn(
+              'flex shrink-0 flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors',
+              isActive
+                ? 'border-primary/30 bg-primary/10'
+                : 'border-border hover:border-border/80 hover:bg-muted',
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-foreground">{label}</span>
+              {/* Fixed-size slot keeps tab width consistent across all states */}
+              <span className="size-3 shrink-0 inline-flex items-center justify-center">
+                {trip.items.length === 0 ? (
+                  <Sparkles className="size-3 text-primary/50" />
+                ) : trip.is_stale ? (
+                  <RefreshCw className="size-2.5 text-foreground/40" />
+                ) : null}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {formatDateRange(trip.start_date, trip.end_date)}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Trip list skeleton ────────────────────────────────────────────────────────
+
+function TripListSkeleton() {
+  return (
+    <div className="flex animate-pulse flex-col gap-4 pt-2">
+      {/* Sub-header */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1.5">
+          <div className="h-4 w-28 rounded bg-muted" />
+          <div className="h-3 w-40 rounded bg-muted/60" />
+        </div>
+        <div className="flex gap-2">
+          <div className="h-8 w-24 rounded-lg bg-muted" />
+          <div className="h-8 w-24 rounded-lg bg-muted" />
+        </div>
+      </div>
+      {/* Category rows */}
+      {[4, 3, 2].map((count, gi) => (
+        <div key={gi} className="flex flex-col gap-0">
+          <div className="mb-1 h-3 w-16 rounded bg-muted/50" />
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 py-2.5">
+              <div className="size-5 shrink-0 rounded bg-muted" />
+              <div className="h-3.5 rounded bg-muted" style={{ width: `${45 + (i * 17) % 35}%` }} />
+              <div className="ml-auto h-3 w-10 rounded bg-muted/60" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Per-trip list view ────────────────────────────────────────────────────────
+
+function TripListView({
   plan,
-  initialList,
+  trip,
+  autoGenerate = false,
 }: {
   plan: Pick<MealPlan, 'id' | 'name' | 'start_date' | 'end_date'>
-  initialList: GroceryList | null
+  trip: GroceryList
+  autoGenerate?: boolean
 }) {
   const router = useRouter()
-  const [list, setList] = useState<GroceryList | null>(initialList)
+  const [list, setList] = useState<GroceryList>(trip)
   const [isGenerating, setIsGenerating] = useState(false)
   const [showRegenDialog, setShowRegenDialog] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [hideChecked, setHideChecked] = useState(false)
-
-  const planName = plan.name ?? defaultPlanName(plan.start_date)
-
-  // ── Generate ──────────────────────────────────────────────────────────────
 
   const generate = useCallback(async () => {
     setIsGenerating(true)
@@ -430,7 +500,11 @@ export default function GroceryListClient({
       const res = await fetch('/api/grocery-lists/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meal_plan_id: plan.id }),
+        body: JSON.stringify({
+          meal_plan_id: plan.id,
+          start_date: trip.start_date,
+          end_date: trip.end_date,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Generation failed'); return }
@@ -441,102 +515,101 @@ export default function GroceryListClient({
     } finally {
       setIsGenerating(false)
     }
-  }, [plan.id, router])
+  }, [plan.id, trip.start_date, trip.end_date, router])
 
-  // ── Optimistic handlers ───────────────────────────────────────────────────
+  // Auto-generate when arriving from the plan page with an empty list
+  useEffect(() => {
+    if (autoGenerate && list.items.length === 0) generate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleToggle = useCallback((itemId: string, checked: boolean) => {
-    setList((prev) => prev ? {
+    setList((prev) => ({
       ...prev,
       items: prev.items.map((i) => i.id === itemId ? { ...i, checked } : i),
-    } : prev)
-    toggleGroceryItem(list!.id, itemId, checked).then((r) => {
+    }))
+    toggleGroceryItem(list.id, itemId, checked).then((r) => {
       if (r.error) toast.error(r.error)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list?.id])
+  }, [list.id])
 
   const handleUpdate = useCallback((itemId: string, fields: Partial<Pick<GroceryItem, 'name' | 'quantity_text' | 'notes'>>) => {
-    setList((prev) => prev ? {
+    setList((prev) => ({
       ...prev,
       items: prev.items.map((i) => i.id === itemId ? { ...i, ...fields } : i),
-    } : prev)
+    }))
   }, [])
 
   const handleAddCustom = useCallback((item: GroceryItem) => {
-    setList((prev) => prev ? { ...prev, items: [...prev.items, item] } : prev)
+    setList((prev) => ({ ...prev, items: [...prev.items, item] }))
     setShowAddForm(false)
   }, [])
 
-  // ── Derived state ─────────────────────────────────────────────────────────
-
-  const regularItems = list?.items.filter((i) => !(i.is_pantry_staple ?? false)) ?? []
-  const pantryItems  = list?.items.filter((i) => i.is_pantry_staple ?? false) ?? []
+  const regularItems  = list.items.filter((i) => !(i.is_pantry_staple ?? false))
+  const pantryItems   = list.items.filter((i) => i.is_pantry_staple ?? false)
   const visibleRegular = hideChecked ? regularItems.filter((i) => !i.checked) : regularItems
   const visiblePantry  = hideChecked ? pantryItems.filter((i) => !i.checked) : pantryItems
   const groups = groupByCategory(visibleRegular)
-
-  // Progress excludes pantry staples — they're assumed already on hand
   const checkedCount = regularItems.filter((i) => i.checked).length
   const totalCount   = regularItems.length
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
-    // Max ~660px, centered on wide screens — grocery lists read best narrow
-    <div className="mx-auto w-full max-w-[660px] flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex flex-col gap-2 px-1">
-        <Link
-          href={`/plans/${plan.id}`}
-          className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" />
-          {planName}
-        </Link>
-
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <h1 className="font-heading text-2xl font-medium tracking-tight">Grocery list</h1>
-            <p className="text-sm text-muted-foreground">{formatDateRange(plan.start_date, plan.end_date)}</p>
-            {list && (
-              <p className="text-xs text-muted-foreground/60">
-                Generated {formatTimestamp(list.generated_at)}
-                {totalCount > 0 && ` · ${checkedCount}/${totalCount} checked`}
-              </p>
-            )}
-          </div>
-
-          {list && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant={hideChecked ? 'secondary' : 'outline'}
-                size="sm"
-                onClick={() => setHideChecked((v) => !v)}
-              >
-                {hideChecked ? `Show checked (${checkedCount})` : 'Hide checked'}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowRegenDialog(true)} disabled={isGenerating}>
-                <RefreshCw className="size-3.5" />
-                Regenerate
-              </Button>
-            </div>
+    <div className="flex flex-col gap-3">
+      {/* Sub-header: generated at + controls */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm font-medium text-foreground">
+            {formatDateRange(trip.start_date, trip.end_date)}
+          </p>
+          {list.items.length > 0 && (
+            <p className="text-xs text-muted-foreground/60">
+              Generated {formatTimestamp(list.generated_at)}
+              {totalCount > 0 && ` · ${checkedCount}/${totalCount} checked`}
+            </p>
           )}
         </div>
+
+        {list.items.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant={hideChecked ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setHideChecked((v) => !v)}
+            >
+              {hideChecked ? `Show checked (${checkedCount})` : 'Hide checked'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowRegenDialog(true)} disabled={isGenerating}>
+              <RefreshCw className="size-3.5" />
+              Regenerate
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Stale banner — shown when the meal plan changed after generation */}
+      {list.is_stale && !isGenerating && list.items.length > 0 && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-primary/20 bg-primary/8 px-3 py-2.5">
+          <RefreshCw className="size-3.5 shrink-0 text-foreground/50" />
+          <p className="flex-1 text-sm text-foreground/70">
+            Your meal plan has changed since this list was generated.
+          </p>
+          <button
+            onClick={() => setShowRegenDialog(true)}
+            className="shrink-0 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            Regenerate
+          </button>
+        </div>
+      )}
 
       {/* Body */}
       {isGenerating ? (
         <GeneratingState />
-      ) : !list ? (
-        <EmptyState onGenerate={generate} />
       ) : list.items.length === 0 ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">
-          This plan has no meal entries — add some meals, then regenerate.
-        </p>
+        <EmptyState onGenerate={generate} />
       ) : (
         <div className="flex flex-col gap-3">
-          {/* Regular items grouped by category */}
           {groups.map(({ category, items }) => (
             <CategorySection
               key={category ?? '__other'}
@@ -548,7 +621,6 @@ export default function GroceryListClient({
             />
           ))}
 
-          {/* Custom item form / button */}
           <div className="pt-1">
             {showAddForm ? (
               <AddCustomItemForm
@@ -567,7 +639,6 @@ export default function GroceryListClient({
             )}
           </div>
 
-          {/* Pantry staples — collapsed by default */}
           {visiblePantry.length > 0 && (
             <PantryStaplesSection
               items={visiblePantry}
@@ -585,6 +656,150 @@ export default function GroceryListClient({
         onConfirm={() => { setShowRegenDialog(false); generate() }}
         isPending={isGenerating}
       />
+    </div>
+  )
+}
+
+// ── Main client component ─────────────────────────────────────────────────────
+
+export default function GroceryListClient({
+  plan,
+  trips,
+  selectedTrip,
+  autoGenerate = false,
+}: {
+  plan: Pick<MealPlan, 'id' | 'name' | 'start_date' | 'end_date'>
+  trips: GroceryList[]
+  selectedTrip: GroceryList | null
+  autoGenerate?: boolean
+}) {
+  const router = useRouter()
+  const planName = plan.name ?? defaultPlanName(plan.start_date)
+
+  // ── Responsive tab switching ──────────────────────────────────────────────
+  // Tabs update synchronously on click; content area shows a skeleton if the
+  // server round-trip takes >150 ms (same pattern as the view/edit toggle).
+
+  const [isTripPending, startTripTransition] = useTransition()
+  const [optimisticTripId, setOptimisticTripId] = useState<string | null>(
+    selectedTrip?.id ?? null
+  )
+  const [showSkeleton, setShowSkeleton] = useState(false)
+
+  useEffect(() => {
+    if (!isTripPending) { setShowSkeleton(false); return }
+    const id = setTimeout(() => setShowSkeleton(true), 150)
+    return () => clearTimeout(id)
+  }, [isTripPending])
+
+  // During a transition use the optimistic value so the clicked tab highlights
+  // immediately. After landing, revert to the server-resolved truth so browser
+  // back/forward works without extra syncing.
+  const activeTripId = isTripPending ? optimisticTripId : (selectedTrip?.id ?? null)
+
+  function handleSelectTrip(tripId: string) {
+    setOptimisticTripId(tripId)
+    startTripTransition(() => {
+      router.push(`/plans/${plan.id}/grocery?trip=${tripId}`, { scroll: false })
+    })
+  }
+
+  // ── Generate all ──────────────────────────────────────────────────────────
+
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false)
+  const emptyTrips = trips.filter((t) => t.items.length === 0)
+
+  async function generateAll() {
+    setIsGeneratingAll(true)
+    try {
+      await Promise.all(
+        emptyTrips.map((trip) =>
+          fetch('/api/grocery-lists/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              meal_plan_id: plan.id,
+              start_date: trip.start_date,
+              end_date: trip.end_date,
+            }),
+          })
+        )
+      )
+      // Navigate to refresh server data; land on the currently active trip
+      router.push(`/plans/${plan.id}/grocery?trip=${activeTripId ?? selectedTrip?.id ?? ''}`)
+    } catch {
+      toast.error('Generation failed — please try again')
+    } finally {
+      setIsGeneratingAll(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-[660px] flex flex-col gap-4">
+      {/* Header */}
+      <div className="flex flex-col gap-2 px-1">
+        <Link
+          href={`/plans/${plan.id}`}
+          className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" />
+          {planName}
+        </Link>
+
+        <div className="flex flex-col gap-0.5">
+          <h1 className="font-heading text-2xl font-medium tracking-tight">Grocery list</h1>
+          <p className="text-sm text-muted-foreground">{formatDateRange(plan.start_date, plan.end_date)}</p>
+        </div>
+      </div>
+
+      {/* Trip selector tabs + generate-all — only shown when there are 2+ trips */}
+      {trips.length > 1 && (
+        <div className="flex items-center gap-3 px-1">
+          <TripTabs trips={trips} activeId={activeTripId} onSelect={handleSelectTrip} />
+          {emptyTrips.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generateAll}
+              disabled={isGeneratingAll}
+              className="shrink-0"
+            >
+              {isGeneratingAll
+                ? <Loader2 className="size-3.5 animate-spin" />
+                : <Sparkles className="size-3.5" />
+              }
+              Generate all
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="px-1">
+        {!selectedTrip ? (
+          <div className="flex flex-col items-center gap-4 py-20 text-center">
+            <div className="rounded-full bg-muted p-4">
+              <ShoppingCart className="size-8 text-muted-foreground" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <p className="font-heading text-lg font-medium">No grocery list yet</p>
+              <p className="max-w-xs text-sm text-muted-foreground">
+                Use the trip strip on the plan editor to generate a list.
+              </p>
+            </div>
+            <Link
+              href={`/plans/${plan.id}`}
+              className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              Back to plan
+            </Link>
+          </div>
+        ) : showSkeleton ? (
+          <TripListSkeleton />
+        ) : (
+          <TripListView key={selectedTrip.id} plan={plan} trip={selectedTrip} autoGenerate={autoGenerate} />
+        )}
+      </div>
     </div>
   )
 }

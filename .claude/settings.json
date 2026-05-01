@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm run *)",
       "Bash(grep -E \"\\\\.\\(tsx?|js\\)$\")",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(npx next *)"
     ],
     "additionalDirectories": [
       "c:\\Code\\Code_Angelo\\_PERSONAL\\forkcast\\src\\app\\(app)\\plans"
