@@ -275,7 +275,7 @@ export async function getUserProfile(userId: string) {
 
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, display_name, macro_target, week_start_day, timezone, grocery_ignore_list')
+    .select('id, display_name, macro_target, week_start_day, timezone, grocery_ignore_list, notion_token, notion_parent_page_id')
     .eq('id', userId)
     .single()
 
@@ -287,5 +287,7 @@ export async function getUserProfile(userId: string) {
     week_start_day: number
     timezone: string
     grocery_ignore_list: string[]
+    notion_token: string | null
+    notion_parent_page_id: string | null
   }
 }

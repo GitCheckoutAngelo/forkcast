@@ -22,6 +22,8 @@ export default async function SettingsPage() {
         email: user.email ?? '',
         week_start_day: profile.week_start_day as WeekStartDay,
         grocery_ignore_list: profile.grocery_ignore_list ?? [],
+        notion_token: profile.notion_token ?? null,
+        notion_parent_page_id: profile.notion_parent_page_id ?? null,
       }}
       planCount={planCount ?? 0}
     />

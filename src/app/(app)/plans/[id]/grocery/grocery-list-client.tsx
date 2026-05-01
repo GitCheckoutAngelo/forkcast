@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState, useTransition } from '
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ArrowLeft, Beef, ChevronDown, Loader2, Leaf, Milk, Minus, Package, Pencil, Plus, RefreshCw, ShoppingCart, Snowflake, Sparkles, Tag, Wheat, X } from 'lucide-react'
+import { ArrowLeft, Beef, ChevronDown, Loader2, Leaf, Milk, Minus, Package, Pencil, Plus, RefreshCw, Send, ShoppingCart, Snowflake, Sparkles, Tag, Wheat, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -359,6 +359,62 @@ function AddCustomItemForm({ listId, onAdd, onCancel }: {
   )
 }
 
+// ── Push to Notion dialog ─────────────────────────────────────────────────────
+
+function PushToNotionDialog({
+  open,
+  onOpenChange,
+  trip,
+  onPush,
+  isPushing,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  trip: GroceryList
+  onPush: (includePantryStaples: boolean) => void
+  isPushing: boolean
+}) {
+  const [includePantry, setIncludePantry] = useState(false)
+  const regularCount = trip.items.filter((i) => !i.is_pantry_staple).length
+  const pantryCount  = trip.items.filter((i) => i.is_pantry_staple).length
+  const pushCount    = includePantry ? trip.items.length : regularCount
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Push to Notion</DialogTitle>
+          <DialogDescription>
+            {formatTripSubtitle(trip.start_date, trip.end_date)} · {regularCount} item{regularCount !== 1 ? 's' : ''}
+            {pantryCount > 0 && ` (+ ${pantryCount} pantry staple${pantryCount !== 1 ? 's' : ''})`}
+          </DialogDescription>
+        </DialogHeader>
+        {pantryCount > 0 && (
+          <label className="flex items-center gap-2.5 text-sm">
+            <Checkbox
+              checked={includePantry}
+              onCheckedChange={(v) => setIncludePantry(v === true)}
+            />
+            Include pantry staples
+          </label>
+        )}
+        <p className="text-sm text-muted-foreground">
+          A new page with {pushCount} item{pushCount !== 1 ? 's' : ''} will be created in your Notion workspace.
+        </p>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPushing}>
+            Cancel
+          </Button>
+          <Button onClick={() => onPush(includePantry)} disabled={isPushing}>
+            {isPushing && <Loader2 className="size-4 animate-spin" />}
+            Push
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Regenerate dialog ─────────────────────────────────────────────────────────
 
 function RegenerateDialog({ open, onOpenChange, onConfirm, isPending }: {
@@ -536,16 +592,20 @@ function TripListSkeleton() {
 function TripListView({
   plan,
   trip,
+  hasNotionToken = false,
   autoGenerate = false,
 }: {
   plan: Pick<MealPlan, 'id' | 'name' | 'start_date' | 'end_date'>
   trip: GroceryList
+  hasNotionToken?: boolean
   autoGenerate?: boolean
 }) {
   const router = useRouter()
   const [list, setList] = useState<GroceryList>(trip)
   const [isGenerating, setIsGenerating] = useState(false)
   const [showRegenDialog, setShowRegenDialog] = useState(false)
+  const [showPushDialog, setShowPushDialog] = useState(false)
+  const [isPushing, setIsPushing] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [hideChecked, setHideChecked] = useState(false)
 
@@ -601,6 +661,27 @@ function TripListView({
     setShowAddForm(false)
   }, [])
 
+  async function handlePush(includePantryStaples: boolean) {
+    setIsPushing(true)
+    try {
+      const res = await fetch('/api/integrations/notion/push-grocery-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trip_id: list.id, include_pantry_staples: includePantryStaples }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Push failed'); return }
+      setShowPushDialog(false)
+      toast.success('Pushed to Notion', {
+        action: { label: 'View in Notion →', onClick: () => window.open(data.notion_page_url as string, '_blank') },
+      })
+    } catch {
+      toast.error('Push failed — please try again')
+    } finally {
+      setIsPushing(false)
+    }
+  }
+
   const regularItems  = list.items.filter((i) => !(i.is_pantry_staple ?? false))
   const pantryItems   = list.items.filter((i) => i.is_pantry_staple ?? false)
   const visibleRegular = hideChecked ? regularItems.filter((i) => !i.checked) : regularItems
@@ -638,6 +719,17 @@ function TripListView({
               <RefreshCw className="size-3.5" />
               Regenerate
             </Button>
+            <span title={!hasNotionToken ? 'Connect Notion in Settings.' : undefined}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPushDialog(true)}
+                disabled={!hasNotionToken || isGenerating}
+              >
+                <Send className="size-3.5" />
+                Notion
+              </Button>
+            </span>
           </div>
         )}
       </div>
@@ -711,6 +803,14 @@ function TripListView({
         onConfirm={() => { setShowRegenDialog(false); generate() }}
         isPending={isGenerating}
       />
+
+      <PushToNotionDialog
+        open={showPushDialog}
+        onOpenChange={setShowPushDialog}
+        trip={list}
+        onPush={handlePush}
+        isPushing={isPushing}
+      />
     </div>
   )
 }
@@ -721,11 +821,13 @@ export default function GroceryListClient({
   plan,
   trips,
   selectedTrip,
+  hasNotionToken = false,
   autoGenerate = false,
 }: {
   plan: Pick<MealPlan, 'id' | 'name' | 'start_date' | 'end_date'>
   trips: GroceryList[]
   selectedTrip: GroceryList | null
+  hasNotionToken?: boolean
   autoGenerate?: boolean
 }) {
   const router = useRouter()
@@ -742,7 +844,10 @@ export default function GroceryListClient({
   const [showSkeleton, setShowSkeleton] = useState(false)
 
   useEffect(() => {
-    if (!isTripPending) { setShowSkeleton(false); return }
+    if (!isTripPending) {
+      const id = setTimeout(() => setShowSkeleton(false), 0)
+      return () => clearTimeout(id)
+    }
     const id = setTimeout(() => setShowSkeleton(true), 150)
     return () => clearTimeout(id)
   }, [isTripPending])
@@ -852,7 +957,7 @@ export default function GroceryListClient({
         ) : showSkeleton ? (
           <TripListSkeleton />
         ) : (
-          <TripListView key={selectedTrip.id} plan={plan} trip={selectedTrip} autoGenerate={autoGenerate} />
+          <TripListView key={selectedTrip.id} plan={plan} trip={selectedTrip} hasNotionToken={hasNotionToken} autoGenerate={autoGenerate} />
         )}
       </div>
     </div>

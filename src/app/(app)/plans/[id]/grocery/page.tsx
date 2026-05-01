@@ -18,11 +18,10 @@ export default async function GroceryListPage({ params, searchParams }: Props) {
   if (!user) return null
 
   const supabase = await createClient()
-  const { data: planData, error } = await supabase
-    .from('meal_plans')
-    .select('id, name, start_date, end_date')
-    .eq('id', id)
-    .single()
+  const [{ data: planData, error }, { data: profileData }] = await Promise.all([
+    supabase.from('meal_plans').select('id, name, start_date, end_date').eq('id', id).single(),
+    supabase.from('user_profiles').select('notion_token').eq('id', user.id).single(),
+  ])
 
   if (error || !planData) notFound()
 
@@ -38,6 +37,7 @@ export default async function GroceryListPage({ params, searchParams }: Props) {
       plan={plan}
       trips={trips}
       selectedTrip={selectedTrip}
+      hasNotionToken={Boolean(profileData?.notion_token)}
       autoGenerate={generate === '1'}
     />
   )

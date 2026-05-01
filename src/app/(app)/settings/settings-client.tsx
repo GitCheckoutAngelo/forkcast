@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { updateProfile, updateMacroTarget, updatePreferences, updateGroceryIgnoreList } from '@/lib/profile/actions'
+import { updateProfile, updateMacroTarget, updatePreferences, updateGroceryIgnoreList, updateNotionSettings } from '@/lib/profile/actions'
 import { deleteAllMealPlans } from '@/lib/meal-plans/actions'
 import { logout } from '@/lib/auth/actions'
 import { createClient } from '@/lib/supabase/browser'
@@ -512,6 +512,132 @@ function GroceryIgnoreListSection({ initialList }: { initialList: string[] }) {
   )
 }
 
+// ── Notion integration ────────────────────────────────────────────────────────
+
+function NotionSection({
+  initialToken,
+  initialParentPageId,
+}: {
+  initialToken: string | null
+  initialParentPageId: string | null
+}) {
+  const [token, setToken] = useState(initialToken ?? '')
+  const [parentPageId, setParentPageId] = useState(initialParentPageId ?? '')
+  const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null)
+  const [isTesting, startTest] = useTransition()
+  const [isSaving, startSave] = useTransition()
+
+  const isConnected = Boolean(initialToken)
+
+  function handleTest() {
+    if (!token.trim()) return
+    setTestStatus(null)
+    startTest(async () => {
+      const res = await fetch('/api/integrations/notion/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok && data.ok) {
+        setTestStatus({ ok: true, message: `Connected to ${data.workspace_name}` })
+      } else {
+        setTestStatus({ ok: false, message: data.error ?? 'Connection failed' })
+      }
+    })
+  }
+
+  function handleSave() {
+    startSave(async () => {
+      const result = await updateNotionSettings({
+        notion_token: token.trim() || null,
+        notion_parent_page_id: parentPageId.trim() || null,
+      })
+      if (result.error) toast.error(result.error)
+      else toast.success('Notion settings saved')
+    })
+  }
+
+  function handleDisconnect() {
+    startSave(async () => {
+      const result = await updateNotionSettings({
+        notion_token: null,
+        notion_parent_page_id: null,
+      })
+      if (result.error) toast.error(result.error)
+      else {
+        setToken('')
+        setParentPageId('')
+        setTestStatus(null)
+        toast.success('Notion disconnected')
+      }
+    })
+  }
+
+  return (
+    <Section title="Integrations — Notion">
+      <Field
+        label="Integration token"
+        hint='Create a Notion integration at notion.so/my-integrations, copy the internal integration token, and share the target page or workspace with this integration.'
+      >
+        <div className="flex gap-2">
+          <Input
+            type="password"
+            value={token}
+            onChange={(e) => { setToken(e.target.value); setTestStatus(null) }}
+            placeholder="secret_…"
+            disabled={isSaving}
+            className="flex-1 font-mono text-xs"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTest}
+            disabled={!token.trim() || isTesting || isSaving}
+          >
+            {isTesting ? 'Testing…' : 'Test connection'}
+          </Button>
+        </div>
+        {testStatus && (
+          <p className={`text-xs ${testStatus.ok ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+            {testStatus.ok ? '✓ ' : '✗ '}{testStatus.message}
+          </p>
+        )}
+      </Field>
+
+      <Field
+        label="Parent page ID (optional)"
+        hint="Paste the ID from a Notion page URL (the 32-character hex string). Leave empty to auto-create a top-level 'Forkcast Grocery Lists' page on first push."
+      >
+        <Input
+          value={parentPageId}
+          onChange={(e) => setParentPageId(e.target.value)}
+          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          disabled={isSaving}
+          className="font-mono text-xs"
+        />
+      </Field>
+
+      <div className="flex flex-wrap items-center gap-3 pt-1">
+        <Button onClick={handleSave} disabled={isSaving || isTesting} size="sm">
+          {isSaving ? 'Saving…' : 'Save'}
+        </Button>
+        {isConnected && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDisconnect}
+            disabled={isSaving}
+            className="border-destructive/40 text-destructive hover:bg-destructive/5 hover:border-destructive"
+          >
+            Disconnect
+          </Button>
+        )}
+      </div>
+    </Section>
+  )
+}
+
 // ── Account ───────────────────────────────────────────────────────────────────
 
 function AccountSection({ email }: { email: string }) {
@@ -619,6 +745,8 @@ interface SettingsClientProps {
     week_start_day: WeekStartDay
     timezone: string
     grocery_ignore_list: string[]
+    notion_token: string | null
+    notion_parent_page_id: string | null
   }
   planCount: number
 }
@@ -641,6 +769,10 @@ export default function SettingsClient({ profile, planCount }: SettingsClientPro
         planCount={planCount}
       />
       <GroceryIgnoreListSection initialList={profile.grocery_ignore_list} />
+      <NotionSection
+        initialToken={profile.notion_token}
+        initialParentPageId={profile.notion_parent_page_id}
+      />
       <AccountSection email={profile.email} />
     </div>
   )

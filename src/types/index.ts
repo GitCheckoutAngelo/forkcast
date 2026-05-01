@@ -64,6 +64,10 @@ export interface UserProfile {
    * marks fuzzy-matching items as pantry staples, collapsing them at the bottom.
    */
   grocery_ignore_list: string[];
+  /** Notion integration — plain text for now, encryption deferred. */
+  notion_token: string | null;
+  notion_parent_page_id: string | null;
+  notion_root_page_id: string | null;
   created_at: ISODateTime;
   updated_at: ISODateTime;
   // Future additions to consider as features are built:

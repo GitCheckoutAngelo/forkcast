@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/auth/current-user'
+import { normalizeNotionPageId } from './utils'
 import type { WeekStartDay } from '@/types'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -119,6 +120,44 @@ export async function updatePreferences(
   if (error) return { error: error.message }
   revalidatePath('/settings')
   revalidatePath('/plans')
+  return {}
+}
+
+export async function updateNotionSettings(data: {
+  notion_token: string | null
+  notion_parent_page_id: string | null
+}): Promise<{ error?: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  let parentPageId = data.notion_parent_page_id
+  if (parentPageId) {
+    parentPageId = normalizeNotionPageId(parentPageId)
+    if (!parentPageId) return { error: 'Could not parse a valid Notion page ID from that input.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ ...data, notion_parent_page_id: parentPageId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return {}
+}
+
+export async function clearNotionRootPage(): Promise<{ error?: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ notion_root_page_id: null })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
   return {}
 }
 
