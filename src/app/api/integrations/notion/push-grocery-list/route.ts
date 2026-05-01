@@ -45,12 +45,19 @@ function todo(text: string) {
   }
 }
 
-function buildBlocks(items: GroceryItem[]): object[] {
+function buildBlocks(items: GroceryItem[], groupByCategory: boolean): object[] {
   const CATEGORY_LABELS: Record<string, string> = {
     produce: 'Produce', protein: 'Protein', dairy: 'Dairy',
     bakery: 'Bakery', pantry: 'Pantry', frozen: 'Frozen', other: 'Other',
   }
   const CATEGORY_ORDER = ['produce', 'protein', 'dairy', 'bakery', 'pantry', 'frozen', 'other', null]
+
+  const itemLine = (item: GroceryItem) =>
+    item.quantity_text ? `${item.name} — ${item.quantity_text}` : item.name
+
+  if (!groupByCategory) {
+    return items.map((item) => todo(itemLine(item)))
+  }
 
   const map = new Map<string | null, GroceryItem[]>()
   for (const item of items) {
@@ -66,8 +73,7 @@ function buildBlocks(items: GroceryItem[]): object[] {
     const label = cat ? (CATEGORY_LABELS[cat] ?? cat) : 'Other'
     blocks.push(heading2(label))
     for (const item of group) {
-      const line = item.quantity_text ? `${item.name} — ${item.quantity_text}` : item.name
-      blocks.push(todo(line))
+      blocks.push(todo(itemLine(item)))
     }
   }
   return blocks
@@ -113,9 +119,10 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     const body = await req.json()
-    const { trip_id, include_pantry_staples = false } = body as {
+    const { trip_id, include_pantry_staples = false, group_by_category = true } = body as {
       trip_id?: string
       include_pantry_staples?: boolean
+      group_by_category?: boolean
     }
 
     if (!trip_id || typeof trip_id !== 'string') {
@@ -167,7 +174,7 @@ export async function POST(req: Request) {
 
     // Build the page title and content blocks
     const title  = tripTitle(tripData.start_date, tripData.end_date)
-    const blocks = buildBlocks(items)
+    const blocks = buildBlocks(items, group_by_category)
 
     // Notion API limits children to 100 blocks per request; split if needed
     const MAX_BLOCKS = 100

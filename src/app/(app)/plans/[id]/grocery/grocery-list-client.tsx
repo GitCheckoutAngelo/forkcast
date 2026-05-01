@@ -371,10 +371,11 @@ function PushToNotionDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
   trip: GroceryList
-  onPush: (includePantryStaples: boolean) => void
+  onPush: (includePantryStaples: boolean, groupByCategory: boolean) => void
   isPushing: boolean
 }) {
   const [includePantry, setIncludePantry] = useState(false)
+  const [groupByCategory, setGroupByCategory] = useState(true)
   const regularCount = trip.items.filter((i) => !i.is_pantry_staple).length
   const pantryCount  = trip.items.filter((i) => i.is_pantry_staple).length
   const pushCount    = includePantry ? trip.items.length : regularCount
@@ -389,15 +390,24 @@ function PushToNotionDialog({
             {pantryCount > 0 && ` (+ ${pantryCount} pantry staple${pantryCount !== 1 ? 's' : ''})`}
           </DialogDescription>
         </DialogHeader>
-        {pantryCount > 0 && (
+        <div className="flex flex-col gap-2.5">
           <label className="flex items-center gap-2.5 text-sm">
             <Checkbox
-              checked={includePantry}
-              onCheckedChange={(v) => setIncludePantry(v === true)}
+              checked={groupByCategory}
+              onCheckedChange={(v) => setGroupByCategory(v === true)}
             />
-            Include pantry staples
+            Group by category
           </label>
-        )}
+          {pantryCount > 0 && (
+            <label className="flex items-center gap-2.5 text-sm">
+              <Checkbox
+                checked={includePantry}
+                onCheckedChange={(v) => setIncludePantry(v === true)}
+              />
+              Include pantry staples
+            </label>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           A new page with {pushCount} item{pushCount !== 1 ? 's' : ''} will be created in your Notion workspace.
         </p>
@@ -405,7 +415,7 @@ function PushToNotionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPushing}>
             Cancel
           </Button>
-          <Button onClick={() => onPush(includePantry)} disabled={isPushing}>
+          <Button onClick={() => onPush(includePantry, groupByCategory)} disabled={isPushing}>
             {isPushing && <Loader2 className="size-4 animate-spin" />}
             Push
           </Button>
@@ -661,13 +671,13 @@ function TripListView({
     setShowAddForm(false)
   }, [])
 
-  async function handlePush(includePantryStaples: boolean) {
+  async function handlePush(includePantryStaples: boolean, groupByCategory: boolean) {
     setIsPushing(true)
     try {
       const res = await fetch('/api/integrations/notion/push-grocery-list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trip_id: list.id, include_pantry_staples: includePantryStaples }),
+        body: JSON.stringify({ trip_id: list.id, include_pantry_staples: includePantryStaples, group_by_category: groupByCategory }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Push failed'); return }
