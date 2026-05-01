@@ -140,7 +140,7 @@ async function aggregateWithClaude(
 
 Rules:
 1. Group identical or equivalent ingredients into one item ("yellow onion", "onion", "medium onion" → "onion").
-2. Sum quantities into a readable string using imperial units (oz, lbs, cups, tbsp, tsp, fl oz). Convert metric quantities where possible ("500g chicken" → "approx 1 lb"). For countable items use natural language ("3 medium onions").
+2. Sum quantities into a readable string using metric units (g, kg, ml, L, tbsp, tsp). Convert imperial quantities where possible ("1 lb chicken" → "450g"). For countable items use natural language ("3 medium onions").
 3. Assign one category: produce, dairy, protein, pantry, frozen, bakery, or other.
 4. food_item entries stay as their own line — do not break into sub-ingredients.
 5. In "src", list the "i" values of every contribution that belongs to this item.${stapleClause}
