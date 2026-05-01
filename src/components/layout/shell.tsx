@@ -82,9 +82,11 @@ const navItems = [
 export default function Shell({
   children,
   userEmail,
+  userDisplayName,
 }: {
   children: React.ReactNode
   userEmail: string | null
+  userDisplayName: string | null
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -139,7 +141,12 @@ export default function Shell({
           </div>
 
           <div className="hidden items-center gap-4 md:flex">
-            <p className="text-sm text-muted-foreground">{userEmail ?? "Signed in"}</p>
+            <p
+              className="text-sm text-muted-foreground"
+              title={userEmail ?? undefined}
+            >
+              Hi, {userDisplayName ?? userEmail?.split('@')[0] ?? 'there'}!
+            </p>
             <form action={logout}>
               <Button type="submit" size="sm" variant="outline">
                 Logout
@@ -186,8 +193,12 @@ export default function Shell({
                 <Separator className="my-4" />
                 <div className="space-y-3 px-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Signed in as</p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">{userEmail ?? "Loading..."}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      Hi, {userDisplayName ?? userEmail?.split('@')[0] ?? 'there'}!
+                    </p>
+                    {userEmail && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">{userEmail}</p>
+                    )}
                   </div>
                   <form action={logout}>
                     <Button type="submit" size="sm" className="w-full">

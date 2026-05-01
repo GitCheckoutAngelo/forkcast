@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import React, { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ArrowLeft, ChevronDown, Loader2, Minus, Pencil, Plus, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Beef, ChevronDown, Loader2, Leaf, Milk, Minus, Package, Pencil, Plus, RefreshCw, ShoppingCart, Snowflake, Sparkles, Tag, Wheat, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +25,15 @@ const CATEGORY_ORDER = ['produce', 'protein', 'dairy', 'bakery', 'pantry', 'froz
 const CATEGORY_LABELS: Record<string, string> = {
   produce: 'Produce', protein: 'Protein', dairy: 'Dairy',
   bakery: 'Bakery', pantry: 'Pantry', frozen: 'Frozen', other: 'Other',
+}
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  produce: Leaf,
+  protein: Beef,
+  dairy:   Milk,
+  bakery:  Wheat,
+  pantry:  Package,
+  frozen:  Snowflake,
+  other:   Tag,
 }
 
 
@@ -167,7 +176,7 @@ function ItemRow({
             )}
           >
             <span className={cn(
-              'truncate text-sm font-medium',
+              'truncate text-sm',
               item.checked && 'text-muted-foreground line-through',
             )}>
               {item.name}
@@ -235,9 +244,13 @@ function CategorySection({
   onToggle: (id: string, checked: boolean) => void
   onUpdate: (id: string, fields: Partial<Pick<GroceryItem, 'name' | 'quantity_text' | 'notes'>>) => void
 }) {
+  const key = category?.toLowerCase() ?? 'other'
+  const Icon = CATEGORY_ICONS[key] ?? Tag
+
   return (
     <div>
-      <p className="py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="flex items-center gap-1.5 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Icon className="size-3 shrink-0" />
         {category ? (CATEGORY_LABELS[category] ?? category) : 'Other'}
       </p>
       <div className="divide-y divide-border/50 group/list">

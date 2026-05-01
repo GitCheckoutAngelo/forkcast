@@ -185,11 +185,40 @@ export async function splitTrip(
   const trip = result.list
   const supabase = await createClient()
 
-  // Both resulting trips get empty items — the original list no longer covers
-  // either date range accurately after the split.
+  // Determine which half has meal entries so we can preserve the existing
+  // grocery list on the side that still needs it.
+  const { data: planDays } = await supabase
+    .from('plan_days')
+    .select('date, meal_slots(meal_entries(id))')
+    .eq('meal_plan_id', trip.meal_plan_id)
+
+  const days = (planDays ?? []) as Array<{
+    date: string
+    meal_slots: Array<{ meal_entries: Array<{ id: string }> }>
+  }>
+
+  const hasEntriesInRange = (start: string, end: string) =>
+    days.some(
+      (d) =>
+        d.date >= start &&
+        d.date <= end &&
+        d.meal_slots.some((s) => s.meal_entries.length > 0),
+    )
+
+  const firstHasEntries  = hasEntriesInRange(trip.start_date, firstPartEndDate)
+  const secondHasEntries = hasEntriesInRange(newTripStartDate, trip.end_date)
+
+  // Keep items on the side that exclusively has entries; clear both otherwise.
+  let firstItems:  GroceryItem[] = []
+  let secondItems: GroceryItem[] = []
+  if (trip.items.length > 0) {
+    if (firstHasEntries && !secondHasEntries)  firstItems  = trip.items
+    else if (secondHasEntries && !firstHasEntries) secondItems = trip.items
+  }
+
   const { error: updateError } = await supabase
     .from('grocery_lists')
-    .update({ end_date: firstPartEndDate, items: [] })
+    .update({ end_date: firstPartEndDate, items: firstItems })
     .eq('id', tripId)
 
   if (updateError) return { error: updateError.message }
@@ -201,7 +230,7 @@ export async function splitTrip(
       start_date: newTripStartDate,
       end_date: trip.end_date,
       name: null,
-      items: [],
+      items: secondItems,
       generated_at: new Date().toISOString(),
     })
     .select()
@@ -211,7 +240,7 @@ export async function splitTrip(
 
   revalidatePath(`/plans/[id]`, 'page')
   return {
-    updatedTrip: { ...trip, end_date: firstPartEndDate, items: [] },
+    updatedTrip: { ...trip, end_date: firstPartEndDate, items: firstItems },
     newTrip: newTrip as GroceryList,
   }
 }
@@ -221,29 +250,35 @@ export async function splitTrip(
 export async function mergeTrips(
   keepTripId: string,
   deleteTripId: string,
-): Promise<{ error?: string }> {
-  const keepResult = await fetchListAndVerifyOwnership(keepTripId)
+): Promise<{ error?: string; mergedTrip?: GroceryList }> {
+  const keepResult   = await fetchListAndVerifyOwnership(keepTripId)
   const deleteResult = await fetchListAndVerifyOwnership(deleteTripId)
-  if (!keepResult.ok) return { error: keepResult.error }
+  if (!keepResult.ok)   return { error: keepResult.error }
   if (!deleteResult.ok) return { error: deleteResult.error }
 
-  const newStartDate =
-    keepResult.list.start_date < deleteResult.list.start_date
-      ? keepResult.list.start_date
-      : deleteResult.list.start_date
-  const newEndDate =
-    keepResult.list.end_date > deleteResult.list.end_date
-      ? keepResult.list.end_date
-      : deleteResult.list.end_date
+  const keepTrip   = keepResult.list
+  const deleteTrip = deleteResult.list
+
+  const newStartDate = keepTrip.start_date < deleteTrip.start_date ? keepTrip.start_date : deleteTrip.start_date
+  const newEndDate   = keepTrip.end_date   > deleteTrip.end_date   ? keepTrip.end_date   : deleteTrip.end_date
+
+  // If exactly one side has items, carry them onto the surviving trip.
+  // If both have items, clear — the combined range needs regeneration.
+  const keepHasItems   = keepTrip.items.length > 0
+  const deleteHasItems = deleteTrip.items.length > 0
+  const mergedItems: GroceryItem[] =
+    keepHasItems && !deleteHasItems   ? keepTrip.items   :
+    deleteHasItems && !keepHasItems   ? deleteTrip.items :
+    []
 
   const supabase = await createClient()
 
-  // The merged trip's list is cleared — it no longer accurately represents
-  // the combined range and must be regenerated.
-  const { error: updateError } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('grocery_lists')
-    .update({ start_date: newStartDate, end_date: newEndDate, items: [] })
+    .update({ start_date: newStartDate, end_date: newEndDate, items: mergedItems })
     .eq('id', keepTripId)
+    .select()
+    .single()
 
   if (updateError) return { error: updateError.message }
 
@@ -255,7 +290,7 @@ export async function mergeTrips(
   if (deleteError) return { error: deleteError.message }
 
   revalidatePath(`/plans/[id]`, 'page')
-  return {}
+  return { mergedTrip: updated as GroceryList }
 }
 
 export async function deleteTrip(tripId: string): Promise<{ error?: string }> {

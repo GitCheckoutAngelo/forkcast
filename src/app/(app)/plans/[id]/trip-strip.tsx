@@ -44,9 +44,9 @@ interface TripGroup {
 }
 
 type ConfirmAction =
-  | { type: 'split'; tripId: string; firstPartEndDate: string; newStartDate: string; tripHasItems: boolean }
+  | { type: 'split'; tripId: string; firstPartEndDate: string; newStartDate: string; tripHasItems: boolean; listPreserved: boolean }
   | { type: 'split-from-scratch'; planStartDate: string; breakDate: string; newStartDate: string; planEndDate: string }
-  | { type: 'merge'; keepId: string; deleteId: string; eitherHasItems: boolean }
+  | { type: 'merge'; keepId: string; deleteId: string; eitherHasItems: boolean; bothHaveItems: boolean }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -304,8 +304,12 @@ function ConfirmDialog({
   const isMerge = action.type === 'merge'
   const title = isMerge ? 'Merge trips?' : 'Split trip?'
   const description = isMerge
-    ? "Merging these trips will clear the existing list(s). You'll need to regenerate the combined list. Continue?"
-    : "Splitting this trip will clear the existing grocery list. You'll need to regenerate lists for both new trips. Continue?"
+    ? action.bothHaveItems
+      ? "Both trips have grocery lists. Merging will clear them — you'll need to regenerate for the combined range. Continue?"
+      : "The existing grocery list will be kept on the merged trip. Continue?"
+    : action.type === 'split' && action.listPreserved
+      ? "The existing grocery list will be carried over to the portion with meals. The other portion will need a new list generated. Continue?"
+      : "Splitting this trip will clear the existing grocery list. You'll need to regenerate lists for both new trips. Continue?"
 
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onCancel() }}>
@@ -393,12 +397,19 @@ export default function TripStrip({
     if (!tripToSplit) return
 
     if (tripToSplit.items.length > 0) {
+      const hasEntriesInRange = (start: string, end: string) =>
+        plan.days.some((d) => d.date >= start && d.date <= end && d.slots.some((s) => s.entries.length > 0))
+      const firstHasEntries  = hasEntriesInRange(tripToSplit.start_date, breakDate)
+      const secondHasEntries = hasEntriesInRange(newStartDate, tripToSplit.end_date)
+      // List is preserved when exactly one side has entries (unambiguous placement)
+      const listPreserved = firstHasEntries !== secondHasEntries
       setConfirmAction({
         type: 'split',
         tripId: tripToSplit.id,
         firstPartEndDate: breakDate,
         newStartDate,
         tripHasItems: true,
+        listPreserved,
       })
     } else {
       doSplit(tripToSplit.id, breakDate, newStartDate)
@@ -413,8 +424,9 @@ export default function TripStrip({
     if (!earlier || !later || earlier.id === later.id) return
 
     const eitherHasItems = earlier.items.length > 0 || later.items.length > 0
+    const bothHaveItems  = earlier.items.length > 0 && later.items.length > 0
     if (eitherHasItems) {
-      setConfirmAction({ type: 'merge', keepId: earlier.id, deleteId: later.id, eitherHasItems: true })
+      setConfirmAction({ type: 'merge', keepId: earlier.id, deleteId: later.id, eitherHasItems: true, bothHaveItems })
     } else {
       doMerge(earlier.id, later.id)
     }
@@ -480,10 +492,16 @@ export default function TripStrip({
     const delTrip  = trips.find((t) => t.id === deleteId)!
     const mergedEnd = keepTrip.end_date > delTrip.end_date ? keepTrip.end_date : delTrip.end_date
 
+    // Optimistic: carry items from whichever side exclusively has them.
+    const optimisticItems =
+      keepTrip.items.length > 0 && delTrip.items.length === 0 ? keepTrip.items :
+      delTrip.items.length > 0  && keepTrip.items.length === 0 ? delTrip.items :
+      []
+
     setTrips((prev) =>
       prev
         .filter((t) => t.id !== deleteId)
-        .map((t) => t.id === keepId ? { ...t, end_date: mergedEnd, items: [] } : t)
+        .map((t) => t.id === keepId ? { ...t, end_date: mergedEnd, items: optimisticItems } : t)
     )
 
     startTransition(async () => {
@@ -491,6 +509,12 @@ export default function TripStrip({
       if (result.error) {
         toast.error(result.error)
         router.refresh()
+        return
+      }
+      if (result.mergedTrip) {
+        setTrips((prev) =>
+          prev.map((t) => t.id === keepId ? { ...t, ...result.mergedTrip } : t)
+        )
       }
     })
   }
