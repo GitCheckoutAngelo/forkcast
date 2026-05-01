@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Plus, RefreshCw, ShoppingCart, X } from 'lucide-react'
+import { Loader2, Minus, Plus, RefreshCw, ShoppingCart, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Dialog,
@@ -167,6 +167,22 @@ function BreakpointZone({
 }
 
 
+function Tip({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <div className="group/tip relative">
+      {children}
+      <span className={cn(
+        'pointer-events-none absolute bottom-full right-0 z-20 mb-1.5',
+        'whitespace-nowrap rounded-md border border-border/60 bg-popover px-2 py-1',
+        'text-[10px] text-muted-foreground shadow-sm',
+        'opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100',
+      )}>
+        {label}
+      </span>
+    </div>
+  )
+}
+
 function GroceryPopover({
   groups,
   plan,
@@ -212,43 +228,55 @@ function GroceryPopover({
             const isLoading =
               navigatingTripId === tripId ||
               (group.trip === null && navigatingTripId === '__new')
-            const hasItems = (group.trip?.items.length ?? 0) > 0
-            const isStale  = hasItems && (group.trip?.is_stale ?? false)
-            const startDate = group.trip?.start_date ?? plan.start_date
-            const endDate   = group.trip?.end_date   ?? plan.end_date
+            const hasItems   = (group.trip?.items.length ?? 0) > 0
+            const isStale    = hasItems && (group.trip?.is_stale ?? false)
+            const noMeals    = group.trip !== null && group.trip.has_entries === false
+            const startDate  = group.trip?.start_date ?? plan.start_date
+            const endDate    = group.trip?.end_date   ?? plan.end_date
 
             return (
-              <div key={gi} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60">
+              <div key={gi} className={cn('flex items-center gap-2 rounded-md px-2 py-1.5', !noMeals && 'hover:bg-muted/60')}>
                 <div className="flex min-w-0 flex-1 flex-col gap-0">
-                  <span className="truncate text-xs font-semibold text-foreground">
+                  <span className={cn('truncate text-xs font-semibold', noMeals ? 'text-foreground/40' : 'text-foreground')}>
                     {resolveAutoName(group)}
                   </span>
                   <span className="text-[10px] text-muted-foreground/70 tabular-nums">
-                    {formatSubtitle(startDate, endDate)}
+                    {formatDayRange(startDate, endDate)}
                   </span>
                 </div>
-                <button
-                  onClick={() => handleAction(group)}
-                  disabled={isLoading}
-                  className={cn(
-                    'flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
-                    'transition-colors hover:bg-background',
-                    isStale
-                      ? 'text-foreground/60 hover:text-foreground'
-                      : hasItems
-                      ? 'text-muted-foreground hover:text-foreground'
-                      : 'text-primary hover:text-primary/80',
-                  )}
-                >
-                  {isLoading ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : isStale ? (
-                    <RefreshCw className="size-3" />
-                  ) : (
-                    <ShoppingCart className="size-3" />
-                  )}
-                  {isStale ? 'Regenerate' : hasItems ? 'View' : 'Generate'}
-                </button>
+                {noMeals ? (
+                  <Tip label="No meals planned for this period">
+                    <span className="flex shrink-0 items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/40">
+                      <Minus className="size-3" />
+                      No meals
+                    </span>
+                  </Tip>
+                ) : (
+                  <Tip label={isStale ? 'Plan changed since last generated' : hasItems ? 'View grocery list' : 'Generate grocery list'}>
+                    <button
+                      onClick={() => handleAction(group)}
+                      disabled={isLoading}
+                      className={cn(
+                        'flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
+                        'transition-colors hover:bg-background',
+                        isStale
+                          ? 'text-foreground/60 hover:text-foreground'
+                          : hasItems
+                          ? 'text-muted-foreground hover:text-foreground'
+                          : 'text-primary hover:text-primary/80',
+                      )}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : isStale ? (
+                        <RefreshCw className="size-3" />
+                      ) : (
+                        <ShoppingCart className="size-3" />
+                      )}
+                      {isStale ? 'Regenerate' : hasItems ? 'View' : 'Generate'}
+                    </button>
+                  </Tip>
+                )}
               </div>
             )
           })}

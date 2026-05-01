@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ArrowLeft, ChevronDown, Loader2, Pencil, Plus, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Loader2, Minus, Pencil, Plus, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +31,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function formatTimestamp(iso: string) {
   const d = new Date(iso)
@@ -44,6 +45,18 @@ function formatDateRange(start: string, end: string) {
     return `${MONTHS[s.getMonth()]} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`
   }
   return `${MONTHS[s.getMonth()]} ${s.getDate()} – ${MONTHS[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`
+}
+
+function formatTripSubtitle(start: string, end: string) {
+  const s = new Date(start + 'T00:00:00')
+  const e = new Date(end + 'T00:00:00')
+  const days = start === end ? DAY_NAMES[s.getDay()] : `${DAY_NAMES[s.getDay()]}–${DAY_NAMES[e.getDay()]}`
+  const dates = start === end
+    ? `${MONTHS[s.getMonth()]} ${s.getDate()}`
+    : s.getMonth() === e.getMonth()
+    ? `${MONTHS[s.getMonth()]} ${s.getDate()}–${e.getDate()}`
+    : `${MONTHS[s.getMonth()]} ${s.getDate()} – ${MONTHS[e.getMonth()]} ${e.getDate()}`
+  return `${days} · ${dates}`
 }
 
 function defaultPlanName(start: string) {
@@ -376,7 +389,34 @@ function GeneratingState() {
   )
 }
 
-function EmptyState({ onGenerate }: { onGenerate: () => void }) {
+function EmptyState({ onGenerate, hasEntries, planId }: {
+  onGenerate: () => void
+  hasEntries: boolean
+  planId: string
+}) {
+  if (!hasEntries) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-20 text-center">
+        <div className="rounded-full bg-muted p-4">
+          <ShoppingCart className="size-8 text-muted-foreground" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="font-heading text-lg font-medium">No meals planned</p>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            Add meals to your plan for this period before generating a grocery list.
+          </p>
+        </div>
+        <Link
+          href={`/plans/${planId}`}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" />
+          Go to plan
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col items-center gap-4 py-20 text-center">
       <div className="rounded-full bg-muted p-4">
@@ -407,7 +447,7 @@ function TripTabs({
   if (trips.length <= 1) return null
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
       {trips.map((trip, i) => {
         const isActive = trip.id === activeId
         const label = trip.name ?? `Trip ${i + 1}` // i kept for label numbering
@@ -416,7 +456,7 @@ function TripTabs({
             key={trip.id}
             onClick={() => onSelect(trip.id)}
             className={cn(
-              'flex shrink-0 flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors',
+              'flex flex-1 flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors',
               isActive
                 ? 'border-primary/30 bg-primary/10'
                 : 'border-border hover:border-border/80 hover:bg-muted',
@@ -427,14 +467,16 @@ function TripTabs({
               {/* Fixed-size slot keeps tab width consistent across all states */}
               <span className="size-3 shrink-0 inline-flex items-center justify-center">
                 {trip.items.length === 0 ? (
-                  <Sparkles className="size-3 text-primary/50" />
+                  trip.has_entries === false
+                    ? <Minus className="size-2.5 text-muted-foreground/40" />
+                    : <Sparkles className="size-3 text-primary/50" />
                 ) : trip.is_stale ? (
                   <RefreshCw className="size-2.5 text-foreground/40" />
                 ) : null}
               </span>
             </div>
             <span className="text-[10px] text-muted-foreground tabular-nums">
-              {formatDateRange(trip.start_date, trip.end_date)}
+              {formatTripSubtitle(trip.start_date, trip.end_date)}
             </span>
           </button>
         )
@@ -560,7 +602,7 @@ function TripListView({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-0.5">
           <p className="text-sm font-medium text-foreground">
-            {formatDateRange(trip.start_date, trip.end_date)}
+            {formatTripSubtitle(trip.start_date, trip.end_date)}
           </p>
           {list.items.length > 0 && (
             <p className="text-xs text-muted-foreground/60">
@@ -607,7 +649,7 @@ function TripListView({
       {isGenerating ? (
         <GeneratingState />
       ) : list.items.length === 0 ? (
-        <EmptyState onGenerate={generate} />
+        <EmptyState onGenerate={generate} hasEntries={trip.has_entries ?? true} planId={plan.id} />
       ) : (
         <div className="flex flex-col gap-3">
           {groups.map(({ category, items }) => (

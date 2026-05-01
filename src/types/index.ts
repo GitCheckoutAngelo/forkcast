@@ -361,4 +361,7 @@ export interface GroceryList {
   /** Computed by listGroceryTrips — not a DB column. True when a meal entry in
    *  this trip's date range was updated after generated_at. */
   is_stale?: boolean;
+  /** Computed by listGroceryTrips — not a DB column. True when at least one
+   *  meal entry exists in the plan for this trip's date range. */
+  has_entries?: boolean;
 }
