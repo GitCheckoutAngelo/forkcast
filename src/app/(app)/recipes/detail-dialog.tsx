@@ -220,7 +220,7 @@ export default function DetailDialog({
                     <span>{ing.name}</span>
                     {ing.quantity != null && (
                       <span className="shrink-0 tabular-nums text-muted-foreground">
-                        {ing.quantity}
+                        {parseFloat(ing.quantity.toFixed(2))}
                         {ing.unit ? ` ${ing.unit}` : ''}
                       </span>
                     )}

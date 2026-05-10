@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic/client'
+import { withRetry } from '@/lib/anthropic/retry'
 import type { RecipeCandidate } from '@/types/recipes'
 
 // ---- Concurrency limiter (2 parallel extractions max) -----------------------
@@ -119,7 +120,7 @@ function parseNutrition(n: unknown): RecipeCandidate['macros_per_serving'] {
   const zero = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }
   if (!n || typeof n !== 'object') return zero
   const obj = n as Record<string, string>
-  const num = (v: string | undefined) => { if (!v) return undefined; const m = /(\d+(?:\.\d+)?)/.exec(v); return m ? parseFloat(m[1]) : undefined }
+  const num = (v: string | undefined) => { if (!v) return undefined; const m = /(\d+(?:\.\d+)?)/.exec(v); return m ? parseFloat(parseFloat(m[1]).toFixed(1)) : undefined }
   return {
     calories: num(obj.calories) ?? 0,
     protein_g: num(obj.proteinContent) ?? 0,
@@ -158,7 +159,7 @@ function jsonLdToCandidate(
     instructions,
     ingredients,
     macros_per_serving: parseNutrition(ld.nutrition),
-    macros_verified: false,
+    macros_verified: parseNutrition(ld.nutrition).calories > 0,
     source_url: url,
     source_site_name: hostname,
   }
@@ -170,7 +171,14 @@ function extractJsonLd(html: string): Record<string, unknown> | null {
   for (const match of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
     try {
       const parsed = JSON.parse(match[1])
-      const items: unknown[] = Array.isArray(parsed) ? parsed : [parsed]
+      // Handle three structural variants:
+      //   1. top-level array:  [{...}, {"@type":"Recipe",...}]
+      //   2. @graph object:    {"@graph":[{...},{"@type":"Recipe",...}]}  ← Yoast SEO / most WP sites
+      //   3. single object:    {"@type":"Recipe",...}
+      const graph = !Array.isArray(parsed) && parsed && typeof parsed === 'object'
+        ? (parsed as Record<string, unknown>)['@graph']
+        : undefined
+      const items: unknown[] = Array.isArray(parsed) ? parsed : Array.isArray(graph) ? graph : [parsed]
       const recipe = items.find((item): item is Record<string, unknown> => {
         if (!item || typeof item !== 'object') return false
         const t = (item as Record<string, unknown>)['@type']
@@ -184,11 +192,14 @@ function extractJsonLd(html: string): Record<string, unknown> | null {
 
 // ---- Image extractor (fallback for Claude path where meta tags are stripped) -
 
-function extractImageFromHtml(html: string): string | undefined {
-  // JSON-LD Recipe.image (highest priority — same source as Path 1)
-  const jsonLd = extractJsonLd(html)
-  if (jsonLd) {
-    const img = parseImage(jsonLd.image)
+function extractImageFromHtml(
+  html: string,
+  jsonLd?: Record<string, unknown> | null,
+): string | undefined {
+  // Use pre-parsed JSON-LD when available; only re-parse when called without it.
+  const ld = jsonLd !== undefined ? jsonLd : extractJsonLd(html)
+  if (ld) {
+    const img = parseImage(ld.image)
     if (img) return img
   }
   // og:image — both attribute orderings
@@ -211,15 +222,37 @@ function extractImageFromHtml(html: string): string | undefined {
 
 // ---- HTML stripper (no dependency — regex is sufficient for this use case) --
 
-function stripHtmlForClaude(html: string, maxChars = 15_000): string {
-  // Prefer the <main> or <article> element to skip nav/footer/sidebar
-  let content = html
+// Returns stripped text and which extraction method was used (for diagnostics).
+function stripHtmlForClaude(html: string, maxChars = 15_000): { text: string; method: string } {
+  // Tier 1: semantic <main> / <article> — search full document, no early cap.
+  // These tags appear once per page and rarely nest, so lazy-match is safe.
   const main = /<main[^>]*>([\s\S]*?)<\/main>/i.exec(html)
   const article = /<article[^>]*>([\s\S]*?)<\/article>/i.exec(html)
-  if (main) content = main[1]
-  else if (article) content = article[1]
 
-  return content
+  let raw: string
+  let method: string
+
+  if (main) {
+    raw = main[1]; method = 'main'
+  } else if (article) {
+    raw = article[1]; method = 'article'
+  } else {
+    // Tier 2: role="main" or common recipe-plugin / CMS content-area class names.
+    // Use position heuristic (slice from match) rather than tag-content extraction to
+    // avoid stopping at the first nested </div>.
+    const hintRe = /<(?:div|section)[^>]+(?:role=["']main["']|(?:id|class)=["'][^"']*(?:wprm-recipe|tasty-recipe|recipe-card|mv-recipe-card|entry-content|post-content|article-content|main-content)[^"']*["'])/i
+    const hintMatch = hintRe.exec(html)
+    if (hintMatch) {
+      raw = html.slice(hintMatch.index, hintMatch.index + 150_000)
+      method = 'content-hint'
+    } else {
+      // Tier 3: no structural hint — generous full-doc cap.
+      raw = html.slice(0, 200_000)
+      method = 'full-doc'
+    }
+  }
+
+  const text = raw
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<nav[\s\S]*?<\/nav>/gi, '')
@@ -231,6 +264,8 @@ function stripHtmlForClaude(html: string, maxChars = 15_000): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, maxChars)
+
+  return { text, method }
 }
 
 // ---- Compact system prompt (~200 tokens) ------------------------------------
@@ -242,7 +277,10 @@ instructions: plain strings, no numbering. ingredients: parse qty/unit/name/prep
 // ---- Handler ----------------------------------------------------------------
 
 export async function POST(req: Request) {
-  await sem.acquire()
+  // Semaphore gates only the Anthropic call, not the HTML fetch or JSON-LD parse.
+  // Module-scoped: effective in long-running processes (local dev); a no-op in
+  // serverless environments where each invocation has its own module scope.
+  let semAcquired = false
   try {
     const { url } = await req.json()
     if (!url || typeof url !== 'string') {
@@ -277,25 +315,31 @@ export async function POST(req: Request) {
     }
 
     // Path 2: Claude with aggressively stripped HTML
-    const stripped = stripHtmlForClaude(html)
+    const { text: stripped, method: extractMethod } = stripHtmlForClaude(html)
     const estTokens = Math.round(stripped.length / 4)
-    console.log(`[extract] claude path  chars=${stripped.length} est_input_tokens≈${estTokens}  url=${url}`)
+    console.log(`[extract] claude path  html_bytes=${html.length}  extract=${extractMethod}  chars=${stripped.length}  est_input_tokens≈${estTokens}  url=${url}`)
 
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
-      system: SYSTEM,
-      messages: [{ role: 'user', content: `URL: ${url}\n\n${stripped}` }],
-    })
+    await sem.acquire()
+    semAcquired = true
+    const response = await withRetry(() =>
+      anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4096,
+        system: SYSTEM,
+        messages: [{ role: 'user', content: `URL: ${url}\n\n${stripped}` }],
+      }),
+    )
 
     console.log(
-      `[extract] claude usage  input=${response.usage.input_tokens}  output=${response.usage.output_tokens}  url=${url}`,
+      `[extract] claude usage  input=${response.usage.input_tokens}  output=${response.usage.output_tokens}  stop_reason=${response.stop_reason}  url=${url}`,
     )
 
     const textBlock = response.content.find((b) => b.type === 'text')
     if (!textBlock || textBlock.type !== 'text') {
       return NextResponse.json({ error: 'Extraction returned no content' }, { status: 502 })
     }
+
+    console.log(`[extract] claude raw  length=${textBlock.text.length}  preview=${textBlock.text.slice(0, 300)}`)
 
     let candidate: RecipeCandidate
     try {
@@ -306,9 +350,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Failed to parse extracted recipe' }, { status: 502 })
     }
 
-    // Claude strips tags so image_url is rarely returned — pull it from the raw HTML
+    // Claude strips tags so image_url is rarely returned — pull it from the raw HTML.
+    // Pass the already-parsed jsonLd to avoid re-parsing it inside extractImageFromHtml.
     if (!candidate.image_url) {
-      candidate.image_url = extractImageFromHtml(html)
+      candidate.image_url = extractImageFromHtml(html, jsonLd)
     }
 
     return NextResponse.json(candidate)
@@ -316,6 +361,6 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : 'Extraction failed'
     return NextResponse.json({ error: message }, { status: 500 })
   } finally {
-    sem.release()
+    if (semAcquired) sem.release()
   }
 }
