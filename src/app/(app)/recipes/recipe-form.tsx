@@ -27,14 +27,23 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, X } from 'lucide-react'
+import { GripVertical, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { recipeFormSchema, type RecipeFormValues } from '@/lib/recipes/schema'
 import type { RecipeWithIngredients } from '@/lib/recipes/queries'
+import type { Macros } from '@/types'
 import { cn } from '@/lib/utils'
 
 // ---- Module-level constants -------------------------------------------------
@@ -363,6 +372,98 @@ const SortableInstructionRow = memo(function SortableInstructionRow({
   )
 })
 
+// ---- Macro comparison dialog ------------------------------------------------
+
+const MACRO_DISPLAY: Array<{ label: string; unit: string; key: keyof Macros }> = [
+  { label: 'Calories', unit: 'kcal', key: 'calories' },
+  { label: 'Protein', unit: 'g', key: 'protein_g' },
+  { label: 'Carbs', unit: 'g', key: 'carbs_g' },
+  { label: 'Fat', unit: 'g', key: 'fat_g' },
+  { label: 'Fiber', unit: 'g', key: 'fiber_g' },
+  { label: 'Sugar', unit: 'g', key: 'sugar_g' },
+  { label: 'Sodium', unit: 'mg', key: 'sodium_mg' },
+]
+
+function isSignificantChange(a: number | undefined, b: number | undefined): boolean {
+  if (a == null || b == null) return false
+  const max = Math.max(Math.abs(a), Math.abs(b), 1)
+  return Math.abs(a - b) / max > 0.1
+}
+
+function MacroComparisonDialog({
+  open,
+  onOpenChange,
+  current,
+  calculated,
+  onAccept,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  current: Macros
+  calculated: Macros
+  onAccept: () => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" showCloseButton>
+        <DialogHeader>
+          <DialogTitle>Recalculated Macros</DialogTitle>
+        </DialogHeader>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          Calculated from ingredients and cooking method
+        </p>
+        <div className="overflow-hidden rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Macro</th>
+                <th className="px-3 py-2 text-right font-medium text-muted-foreground">Current</th>
+                <th className="px-3 py-2 text-right font-medium text-muted-foreground">
+                  Calculated
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {MACRO_DISPLAY.map(({ label, unit, key }) => {
+                const curVal = current[key] as number | undefined
+                const calcVal = calculated[key] as number | undefined
+                if (curVal == null && calcVal == null) return null
+                const changed = isSignificantChange(curVal, calcVal)
+                return (
+                  <tr
+                    key={key}
+                    className={cn(
+                      'border-b last:border-0',
+                      changed && 'bg-amber-50/60 dark:bg-amber-950/20',
+                    )}
+                  >
+                    <td className="px-3 py-2 text-muted-foreground">{label}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {curVal != null ? `${Math.round(curVal * 10) / 10}${unit}` : '—'}
+                    </td>
+                    <td
+                      className={cn(
+                        'px-3 py-2 text-right tabular-nums font-medium',
+                        changed && 'text-amber-700 dark:text-amber-400',
+                      )}
+                    >
+                      {calcVal != null ? `${Math.round(calcVal * 10) / 10}${unit}` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>Keep current</DialogClose>
+          <Button onClick={onAccept}>Use calculated values</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ---- Main component ---------------------------------------------------------
 
 interface RecipeFormProps {
@@ -400,6 +501,67 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
     remove: removeInstruction,
     move: moveInstruction,
   } = useFieldArray({ control, name: 'instructions' })
+
+  // Recalculate macros state
+  const [isCalculating, setIsCalculating] = useState(false)
+  const [calcState, setCalcState] = useState<{ current: Macros; calculated: Macros } | null>(null)
+  const [calcError, setCalcError] = useState<string | null>(null)
+  const [showComparison, setShowComparison] = useState(false)
+
+  const watchedIngredients = useWatch({ control, name: 'ingredients' })
+  const canRecalculate = watchedIngredients.length >= 2
+
+  async function handleRecalculate() {
+    setIsCalculating(true)
+    setCalcError(null)
+    try {
+      const values = getValues()
+      const current = values.macros_per_serving as Macros
+      const body = {
+        ingredients: values.ingredients,
+        instructions: values.instructions.map((i) => i.text).filter(Boolean),
+        servings: values.servings,
+        name: values.name || undefined,
+        cuisine: values.cuisine || undefined,
+      }
+      const res = await fetch('/api/recipes/recalculate-macros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(
+          (data as { error?: string }).error ?? "Couldn't calculate macros — try again or enter manually",
+        )
+      }
+      const calculated: Macros = await res.json()
+      setCalcState({ current, calculated })
+      setShowComparison(true)
+    } catch (err) {
+      setCalcError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't calculate macros — try again or enter manually",
+      )
+    } finally {
+      setIsCalculating(false)
+    }
+  }
+
+  function handleAcceptCalculated() {
+    if (!calcState) return
+    const m = calcState.calculated
+    setValue('macros_per_serving.calories', m.calories, { shouldValidate: true })
+    setValue('macros_per_serving.protein_g', m.protein_g, { shouldValidate: true })
+    setValue('macros_per_serving.carbs_g', m.carbs_g, { shouldValidate: true })
+    setValue('macros_per_serving.fat_g', m.fat_g, { shouldValidate: true })
+    setValue('macros_per_serving.fiber_g', m.fiber_g, { shouldValidate: true })
+    setValue('macros_per_serving.sugar_g', m.sugar_g, { shouldValidate: true })
+    setValue('macros_per_serving.sodium_mg', m.sodium_mg, { shouldValidate: true })
+    setValue('macros_verified', false, { shouldValidate: true })
+    setShowComparison(false)
+  }
 
   // Stable sensor setup — KEYBOARD_SENSOR_OPTIONS is module-level so useSensor
   // memo never invalidates across renders.
@@ -455,6 +617,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
   }
 
   return (
+    <>
     <form id={formId} onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
       {/* Basic Info */}
       <div className="flex flex-col gap-4">
@@ -594,55 +757,118 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
       </div>
 
       {/* Macros */}
-      <div className="flex flex-col gap-4">
-        <Label>Macros per serving</Label>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {(
-            [
-              ['calories', 'Calories (kcal)'],
-              ['protein_g', 'Protein (g)'],
-              ['carbs_g', 'Carbs (g)'],
-              ['fat_g', 'Fat (g)'],
-            ] as const
-          ).map(([key, label]) => (
-            <div key={key} className="flex flex-col gap-1.5">
-              <Label htmlFor={`rf-${key}`} className="text-xs">
-                {label}
-              </Label>
-              <Input
-                id={`rf-${key}`}
-                type="number"
-                min="0"
-                step="0.1"
-                aria-invalid={!!errors.macros_per_serving?.[key]}
-                {...register(`macros_per_serving.${key}`)}
-              />
-            </div>
-          ))}
+      <div className="flex flex-col gap-3">
+        {/* Header: label + recalculate button */}
+        <div className="flex items-center justify-between gap-2">
+          <Label>Macros per serving</Label>
+          <span
+            title={!canRecalculate ? 'Add at least 2 ingredients to recalculate' : undefined}
+            className={!canRecalculate ? 'cursor-not-allowed' : undefined}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!canRecalculate || isCalculating}
+              onClick={handleRecalculate}
+            >
+              {isCalculating ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1.5 size-3.5" />
+              )}
+              {isCalculating ? 'Calculating…' : 'Recalculate from ingredients'}
+            </Button>
+          </span>
         </div>
+        {calcError && <p className="text-xs text-destructive">{calcError}</p>}
 
-        <div className="grid grid-cols-3 gap-3">
-          {(
-            [
-              ['fiber_g', 'Fiber (g)'],
-              ['sugar_g', 'Sugar (g)'],
-              ['sodium_mg', 'Sodium (mg)'],
-            ] as const
-          ).map(([key, label]) => (
-            <div key={key} className="flex flex-col gap-1.5">
-              <Label htmlFor={`rf-${key}`} className="text-xs">
-                {label}
-              </Label>
+        {/* Panel: mirrors detail-dialog layout */}
+        <div className="rounded-xl border border-border bg-muted/30">
+          {/* Calories — full-width headline row */}
+          <div className="flex flex-col items-center px-4 pb-3 pt-4">
+            <div className="flex items-baseline gap-1.5">
               <Input
-                id={`rf-${key}`}
+                id="rf-calories"
                 type="number"
                 min="0"
                 step="0.1"
-                placeholder="—"
-                {...register(`macros_per_serving.${key}`)}
+                aria-invalid={!!errors.macros_per_serving?.calories}
+                className="h-10 w-28 text-center text-xl font-heading font-semibold sm:text-2xl"
+                {...register('macros_per_serving.calories')}
               />
+              <span className="text-base text-muted-foreground">kcal</span>
             </div>
-          ))}
+            <Label
+              htmlFor="rf-calories"
+              className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground"
+            >
+              Calories
+            </Label>
+          </div>
+
+          {/* Divider */}
+          <div className="border-b border-border/40" />
+
+          {/* 2×3 macro grid */}
+          <div className="grid grid-cols-3">
+            {(
+              [
+                ['protein_g', 'Protein', 'g'],
+                ['carbs_g', 'Carbs', 'g'],
+                ['fat_g', 'Fat', 'g'],
+              ] as const
+            ).map(([key, label, unit]) => (
+              <div key={key} className="flex flex-col items-center px-2 py-3">
+                <div className="flex items-baseline gap-0.5">
+                  <Input
+                    id={`rf-${key}`}
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    aria-invalid={!!errors.macros_per_serving?.[key]}
+                    className="h-7 w-full min-w-0 flex-1 px-1 text-center font-heading font-semibold"
+                    {...register(`macros_per_serving.${key}`)}
+                  />
+                  <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
+                </div>
+                <Label
+                  htmlFor={`rf-${key}`}
+                  className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground"
+                >
+                  {label}
+                </Label>
+              </div>
+            ))}
+            {(
+              [
+                ['fiber_g', 'Fiber', 'g'],
+                ['sugar_g', 'Sugar', 'g'],
+                ['sodium_mg', 'Sodium', 'mg'],
+              ] as const
+            ).map(([key, label, unit]) => (
+              <div key={key} className="flex flex-col items-center px-2 py-3">
+                <div className="flex items-baseline gap-0.5">
+                  <Input
+                    id={`rf-${key}`}
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="—"
+                    className="h-7 w-full min-w-0 flex-1 px-1 text-center font-heading font-semibold"
+                    {...register(`macros_per_serving.${key}`)}
+                  />
+                  <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
+                </div>
+                <Label
+                  htmlFor={`rf-${key}`}
+                  className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground"
+                >
+                  {label}
+                </Label>
+              </div>
+            ))}
+          </div>
         </div>
 
         <Controller
@@ -684,5 +910,15 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
         </div>
       </div>
     </form>
+    {calcState && (
+      <MacroComparisonDialog
+        open={showComparison}
+        onOpenChange={(v) => { if (!v) setShowComparison(false) }}
+        current={calcState.current}
+        calculated={calcState.calculated}
+        onAccept={handleAcceptCalculated}
+      />
+    )}
+    </>
   )
 }

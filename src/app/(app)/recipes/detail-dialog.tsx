@@ -29,25 +29,6 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
   snack: 'Snack',
 }
 
-interface MacroRowProps {
-  label: string
-  value: number | undefined
-  unit: string
-}
-
-function MacroRow({ label, value, unit }: MacroRowProps) {
-  if (value == null) return null
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className="text-base font-semibold tabular-nums">
-        {Math.round(value)}
-        <span className="text-xs font-normal text-muted-foreground">{unit}</span>
-      </span>
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
-    </div>
-  )
-}
-
 interface DetailDialogProps {
   recipe: RecipeWithIngredients | null
   open: boolean
@@ -166,8 +147,9 @@ export default function DetailDialog({
           )}
 
           {/* Macros panel */}
-          <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="rounded-xl border border-border bg-muted/30">
+            {/* Per serving / badge */}
+            <div className="flex items-center justify-between px-4 pb-1 pt-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Per serving
               </p>
@@ -183,16 +165,47 @@ export default function DetailDialog({
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap justify-around gap-4">
-              <MacroRow label="Calories" value={macros.calories} unit="kcal" />
-              <MacroRow label="Protein" value={macros.protein_g} unit="g" />
-              <MacroRow label="Carbs" value={macros.carbs_g} unit="g" />
-              <MacroRow label="Fat" value={macros.fat_g} unit="g" />
-              {macros.fiber_g != null && <MacroRow label="Fiber" value={macros.fiber_g} unit="g" />}
-              {macros.sugar_g != null && <MacroRow label="Sugar" value={macros.sugar_g} unit="g" />}
-              {macros.sodium_mg != null && (
-                <MacroRow label="Sodium" value={macros.sodium_mg} unit="mg" />
-              )}
+
+            {/* Calories headline */}
+            <div className="flex flex-col items-center px-4 pb-3">
+              <span className="font-heading text-2xl font-semibold tabular-nums sm:text-3xl">
+                {Math.round(macros.calories)}
+                <span className="ml-1 text-base font-normal text-muted-foreground">kcal</span>
+              </span>
+              <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Calories
+              </span>
+            </div>
+
+            {/* Divider */}
+            <div className="border-b border-border/40" />
+
+            {/* 2×3 macro grid */}
+            <div className="grid grid-cols-3">
+              {[
+                { label: 'Protein', value: macros.protein_g, unit: 'g' },
+                { label: 'Carbs', value: macros.carbs_g, unit: 'g' },
+                { label: 'Fat', value: macros.fat_g, unit: 'g' },
+                { label: 'Fiber', value: macros.fiber_g, unit: 'g' },
+                { label: 'Sugar', value: macros.sugar_g, unit: 'g' },
+                { label: 'Sodium', value: macros.sodium_mg, unit: 'mg' },
+              ].map(({ label, value, unit }) => (
+                <div key={label} className="flex flex-col items-center px-2 py-3">
+                  {value != null ? (
+                    <span className="font-heading text-base font-semibold tabular-nums">
+                      {Math.round(value)}
+                      <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+                    </span>
+                  ) : (
+                    <span className="font-heading text-base font-semibold text-muted-foreground">
+                      —
+                    </span>
+                  )}
+                  <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {label}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
