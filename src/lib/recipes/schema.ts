@@ -26,6 +26,7 @@ export const ingredientSchema = z.object({
 
 export const recipeFormSchema = z.object({
   name: z.string().min(1, 'Recipe name is required'),
+  display_name: z.string().optional(),
   description: z.string().optional(),
   servings: z.coerce.number().min(0.1, 'Must be > 0'),
   prep_time_min: nullableNumber,

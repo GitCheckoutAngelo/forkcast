@@ -138,6 +138,7 @@ export interface Recipe {
   id: UUID;
   user_id: UUID;
   name: string;
+  display_name: string | null;
   description: string | null;
   source: RecipeSource | null;   // null for user-authored recipes
   servings: number;              // how many servings the full recipe yields

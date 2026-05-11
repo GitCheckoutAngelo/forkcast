@@ -31,6 +31,7 @@ function buildPayload(data: RecipeFormValues, id?: string) {
     recipe: {
       ...(id ? { id } : {}),
       name: data.name,
+      display_name: data.display_name || null,
       description: data.description || null,
       source,
       servings: data.servings,

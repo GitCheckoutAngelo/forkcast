@@ -35,7 +35,7 @@ function EntryDetailDialog({
 }) {
   const name =
     entry.consumable.kind === 'recipe'
-      ? entry.consumable.recipe.name
+      ? (entry.consumable.recipe.display_name ?? entry.consumable.recipe.name)
       : entry.consumable.food_item.name
   const m = entry.effective_macros
   const rows = [
@@ -106,7 +106,7 @@ function EntryCard({
 
   const name =
     entry.consumable.kind === 'recipe'
-      ? entry.consumable.recipe.name
+      ? (entry.consumable.recipe.display_name ?? entry.consumable.recipe.name)
       : entry.consumable.food_item.name
 
   // Derive kcal from the current input so the display updates live as the user types.

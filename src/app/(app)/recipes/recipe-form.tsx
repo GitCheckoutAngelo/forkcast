@@ -63,6 +63,7 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 function toFormValues(recipe: RecipeWithIngredients): RecipeFormValues {
   return {
     name: recipe.name,
+    display_name: recipe.display_name ?? '',
     description: recipe.description ?? '',
     servings: recipe.servings,
     prep_time_min: recipe.prep_time_min,
@@ -755,6 +756,14 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
           <Label htmlFor="rf-name">Name *</Label>
           <Input id="rf-name" aria-invalid={!!errors.name} {...register('name')} />
           {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rf-display-name">
+            Display name
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">(shown in meal planner)</span>
+          </Label>
+          <Input id="rf-display-name" placeholder="e.g. Chicken Adobo" {...register('display_name')} />
         </div>
 
         <div className="flex flex-col gap-1.5">

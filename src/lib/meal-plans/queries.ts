@@ -47,6 +47,7 @@ const SLOT_ORDER: Record<MealSlotType, number> = {
 type RawRecipePartial = {
   id: string
   name: string
+  display_name: string | null
   description: string | null
   macros_per_serving: Macros
   servings: number
@@ -248,7 +249,7 @@ export async function getMealPlan(
           *,
           entries:meal_entries (
             *,
-            recipe:recipes (id, name, description, macros_per_serving, servings, image_url, cuisine, meal_types, tags),
+            recipe:recipes (id, name, display_name, description, macros_per_serving, servings, image_url, cuisine, meal_types, tags),
             food_item:food_items (id, name, brand, macros_per_serving, serving_size, serving_unit, notes)
           )
         )
