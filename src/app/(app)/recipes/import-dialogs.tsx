@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
   AlertCircle,
+  BookOpen,
   Check,
   Clock,
   Globe,
@@ -402,7 +403,7 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      <DialogContent className="flex h-screen w-screen flex-col gap-0 overflow-hidden rounded-none p-0 top-0 left-0 translate-x-0 translate-y-0 max-w-none sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:h-auto sm:min-h-[480px] sm:max-h-[90vh] sm:w-full sm:max-w-2xl sm:rounded-xl">
         <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle>Search for Recipes</DialogTitle>
         </DialogHeader>
@@ -410,24 +411,26 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
         <div className="shrink-0 border-b px-6 py-3">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 hidden size-4 -translate-y-1/2 text-muted-foreground sm:block" />
               <Input
                 placeholder="e.g. chicken adobo, vegan pasta, 30-minute meals"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !isDisabled && handleSearch()}
-                className="pl-8"
+                className="sm:pl-8"
                 disabled={isDisabled}
                 autoFocus
               />
             </div>
             <Button onClick={handleSearch} disabled={!query.trim() || isDisabled}>
-              {isSearching ? <Loader2 className="size-4 animate-spin" /> : 'Search'}
+              {isSearching
+                ? <Loader2 className="size-4 animate-spin" />
+                : <><Search className="size-4 sm:hidden" /><span className="hidden sm:inline">Search</span></>}
             </Button>
           </div>
         </div>
 
-        <div className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-4', isLocking && 'pointer-events-none')}>
+        <div className={cn('flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-4', isLocking && 'pointer-events-none')}>
           {isSearching && (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -438,6 +441,12 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
                   ? <><Sparkles className="size-3 text-primary" />Searching with AI… this may take a moment</>
                   : <><Loader2 className="size-3 animate-spin" />Searching…</>}
               </div>
+            </div>
+          )}
+          {!isSearching && !searchError && previews === null && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+              <BookOpen className="size-10 text-muted-foreground/20" />
+              <p className="max-w-[160px] text-sm text-muted-foreground">Your searched recipes appear here</p>
             </div>
           )}
           {searchError && (
@@ -722,7 +731,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
     <Dialog open={open} onOpenChange={(next) => { if (!next) handleRequestClose() }}>
       <DialogContent
         showCloseButton={false}
-        className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        className="flex h-screen w-screen flex-col gap-0 overflow-hidden rounded-none p-0 top-0 left-0 translate-x-0 translate-y-0 max-w-none sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:h-[90vh] sm:w-full sm:max-w-2xl sm:rounded-xl"
       >
         {/* Header */}
         <DialogHeader className="shrink-0 border-b px-6 py-4">
