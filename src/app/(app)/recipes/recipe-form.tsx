@@ -27,7 +27,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, GripVertical, Loader2, Plus, Sparkles, X } from 'lucide-react'
+import { Check, GripVertical, ImageOff, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -126,10 +126,12 @@ function ImageCandidatePicker({
   onSelect: (url: string) => void
 }) {
   const current = useWatch({ control, name: 'image_url' }) ?? ''
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(new Set())
   return (
     <div className="flex flex-wrap gap-2 pt-1">
       {candidates.map((url, i) => {
         const selected = current === url
+        const failed = failedUrls.has(url)
         return (
           <button
             key={i}
@@ -137,12 +139,21 @@ function ImageCandidatePicker({
             onClick={() => onSelect(url)}
             className={cn(
               'relative h-16 w-16 overflow-hidden rounded-lg border-2 transition-all',
-              selected
-                ? 'border-primary'
-                : 'border-border hover:border-foreground/40',
+              selected ? 'border-primary' : 'border-border hover:border-foreground/40',
             )}
           >
-            <img src={url} alt={`Image option ${i + 1}`} className="h-full w-full object-cover" />
+            {failed ? (
+              <div className="flex h-full w-full items-center justify-center bg-muted">
+                <ImageOff className="size-5 text-muted-foreground/50" />
+              </div>
+            ) : (
+              <img
+                src={url}
+                alt={`Image option ${i + 1}`}
+                className="h-full w-full object-cover"
+                onError={() => setFailedUrls((prev) => new Set([...prev, url]))}
+              />
+            )}
             {selected && (
               <div className="absolute inset-0 flex items-end justify-end bg-primary/20 p-1">
                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
@@ -183,7 +194,11 @@ function ImagePreview({ control }: { control: Control<RecipeFormValues> }) {
           />
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">Could not load image from this URL</p>
+        <div className="h-52 overflow-hidden rounded-lg border border-border bg-muted">
+          <div className="flex h-full w-full items-center justify-center">
+            <ImageOff className="size-8 text-muted-foreground/40" />
+          </div>
+        </div>
       )}
     </div>
   )
@@ -857,15 +872,27 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
             </Button>
           </div>
           {reparseError && <p className="text-xs text-destructive">{reparseError}</p>}
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIngredientDragEnd}>
-            <SortableContext items={ingredientFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-              <div className="flex flex-col gap-2">
-                {ingredientFields.map((field, index) => (
-                  <SortableIngredientRow key={field.id} id={field.id} index={index} register={register} onRemove={removeIngredient} />
-                ))}
+          <div className="relative">
+            <div className={cn('transition-opacity duration-150', isReparsing && 'pointer-events-none opacity-40')}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIngredientDragEnd}>
+                <SortableContext items={ingredientFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+                  <div className="flex flex-col gap-2">
+                    {ingredientFields.map((field, index) => (
+                      <SortableIngredientRow key={field.id} id={field.id} index={index} register={register} onRemove={removeIngredient} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
+            {isReparsing && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex items-center gap-2 rounded-lg bg-background/90 px-3 py-2 text-sm text-muted-foreground shadow-sm">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Parsing ingredients…
+                </div>
               </div>
-            </SortableContext>
-          </DndContext>
+            )}
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -928,7 +955,16 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
         </div>
         {calcError && <p className="text-xs text-destructive">{calcError}</p>}
 
-        <div className="rounded-xl border border-border bg-muted/30">
+        <div className="relative rounded-xl border border-border bg-muted/30">
+          {isCalculating && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/60">
+              <div className="flex items-center gap-2 rounded-lg bg-background/90 px-3 py-2 text-sm text-muted-foreground shadow-sm">
+                <Loader2 className="size-3.5 animate-spin" />
+                Calculating…
+              </div>
+            </div>
+          )}
+          <div className={cn('transition-opacity duration-150', isCalculating && 'opacity-40')}>
           <div className="flex flex-col items-center px-4 pb-3 pt-4">
             <div className="flex items-baseline gap-1.5">
               <Input
@@ -992,6 +1028,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
               </div>
             ))}
           </div>
+          </div>{/* end opacity wrapper */}
         </div>
 
         <Controller

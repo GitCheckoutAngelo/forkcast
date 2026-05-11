@@ -58,6 +58,11 @@ export default function DetailDialog({
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    setConfirmDelete(false)
+    setImgError(false)
+  }, [recipe?.id])
+
+  useEffect(() => {
     if (!open) return
     setSection('overview')
     setVisited(new Set(['overview']))

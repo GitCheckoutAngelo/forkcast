@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
   AlertCircle,
@@ -54,6 +54,33 @@ interface TabState {
 
 // ---- Helpers ----------------------------------------------------------------
 
+const UNSUPPORTED_DOMAINS = [
+  'youtube.com', 'youtu.be',
+  'reddit.com',
+  'facebook.com', 'fb.com',
+  'instagram.com',
+  'tiktok.com',
+  'twitter.com', 'x.com',
+  'pinterest.com', 'pinterest.co.uk',
+]
+
+function isUnsupportedDomain(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '')
+    return UNSUPPORTED_DOMAINS.some((d) => hostname === d || hostname.endsWith(`.${d}`))
+  } catch {
+    return false
+  }
+}
+
+async function safeJson(res: Response): Promise<Record<string, unknown>> {
+  try {
+    return await res.json()
+  } catch {
+    return { error: "Couldn't read the server response — the site may be blocking access. Try again or use a different URL.", retryable: true }
+  }
+}
+
 function candidateToFormValues(c: RecipeCandidate): RecipeFormValues {
   return {
     name: c.name,
@@ -97,8 +124,7 @@ function siteName(url: string): string {
 }
 
 function DeferredMount({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false)
   return mounted ? <>{children}</> : null
 }
 
@@ -129,21 +155,25 @@ export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDi
   async function handleImport() {
     if (!url.trim()) return
     setError(null)
+    const trimmed = url.trim()
+    if (isUnsupportedDomain(trimmed)) {
+      setError('Recipe import isn\'t supported for YouTube, Reddit, or Facebook.')
+      return
+    }
     setLoadingPhase('reading')
     setIsLoading(true)
     try {
-      const trimmed = url.trim()
       // Step 1: fast path — JSON-LD only, no Claude
       const res1 = await fetch('/api/recipes/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmed, fastOnly: true }),
       })
-      const data1 = await res1.json()
-      if (!res1.ok) throw new Error(data1.error ?? 'Extraction failed')
+      const data1 = await safeJson(res1)
+      if (!res1.ok) throw new Error((data1.error as string | undefined) ?? 'Extraction failed')
 
       if (!data1.fallback) {
-        onExtracted(data1 as RecipeCandidate, true)
+        onExtracted(data1 as unknown as RecipeCandidate, true)
         handleClose(false)
         return
       }
@@ -155,9 +185,9 @@ export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmed }),
       })
-      const data2 = await res2.json()
-      if (!res2.ok) throw new Error(data2.error ?? 'Extraction failed')
-      onExtracted(data2 as RecipeCandidate, false)
+      const data2 = await safeJson(res2)
+      if (!res2.ok) throw new Error((data2.error as string | undefined) ?? 'Extraction failed')
+      onExtracted(data2 as unknown as RecipeCandidate, false)
       handleClose(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -366,7 +396,8 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Search failed')
-      setPreviews(data as RecipePreview[])
+      const filtered = (data as RecipePreview[]).filter((p) => !isUnsupportedDomain(p.source.url))
+      setPreviews(filtered)
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : 'Search failed')
     } finally {
@@ -581,8 +612,17 @@ interface ImportWalkthroughProps {
 }
 
 export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: ImportWalkthroughProps) {
-  const [tabs, setTabs] = useState<TabState[]>([])
-  const [activeTabId, setActiveTabId] = useState('')
+  const [tabs, setTabs] = useState<TabState[]>(() => items.map((item, i) => ({
+    id: `tab-${i}`,
+    label: item.label || `Recipe ${i + 1}`,
+    url: item.type === 'pending' ? item.url : null,
+    searchImageUrl: item.type === 'pending' ? item.image_url : undefined,
+    status: item.type === 'ready' ? 'ready' : 'loading',
+    candidate: item.type === 'ready' ? item.candidate : null,
+    error: null,
+    autoReparseIngredients: item.type === 'ready' ? (item.fromFastPath ?? false) : false,
+  })))
+  const [activeTabId, setActiveTabId] = useState(() => items.length > 0 ? 'tab-0' : '')
   const [showConfirmClose, setShowConfirmClose] = useState(false)
   const [savedCount, setSavedCount] = useState(0)
   const [isPending, startTransition] = useTransition()
@@ -593,33 +633,17 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
     const el = tabButtonRefs.current.get(activeTabId)
     if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth })
   }, [activeTabId, tabs])
+
   // Tracks which tab ids have had extraction fired to prevent double-firing
   const extractingRef = useRef<Set<string>>(new Set())
 
-  // Initialize tabs and fire extractions when dialog opens
+  // Fire extractions on mount — component remounts fresh for each new walkthrough session
   useEffect(() => {
-    if (!open || items.length === 0) return
-    extractingRef.current = new Set()
-    const newTabs: TabState[] = items.map((item, i) => ({
-      id: `tab-${i}`,
-      label: item.label || `Recipe ${i + 1}`,
-      url: item.type === 'pending' ? item.url : null,
-      searchImageUrl: item.type === 'pending' ? item.image_url : undefined,
-      status: item.type === 'ready' ? 'ready' : 'loading',
-      candidate: item.type === 'ready' ? item.candidate : null,
-      error: null,
-      autoReparseIngredients: item.type === 'ready' ? (item.fromFastPath ?? false) : false,
-    }))
-    setTabs(newTabs)
-    setActiveTabId(newTabs[0]?.id ?? '')
-    setSavedCount(0)
-    setShowConfirmClose(false)
-    newTabs.forEach((tab) => {
+    tabs.forEach((tab) => {
       if (tab.status === 'loading' && tab.url) runExtract(tab.id, tab.url)
     })
-  // Items identity changes when the dialog opens with new selections; open
-  // is the stable trigger. eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function setTabError(tabId: string, error: string, retryable: boolean) {
     setTabs((prev) =>
@@ -637,9 +661,9 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, fastOnly: true }),
       })
-      let data = await res.json()
+      let data = await safeJson(res)
       if (!res.ok) {
-        setTabError(tabId, data.error ?? 'Extraction failed', data.retryable !== false)
+        setTabError(tabId, (data.error as string | undefined) ?? 'Extraction failed', data.retryable !== false)
         return
       }
 
@@ -652,16 +676,16 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url }),
         })
-        data = await res.json()
+        data = await safeJson(res)
         if (!res.ok) {
-          setTabError(tabId, data.error ?? 'Extraction failed', data.retryable !== false)
+          setTabError(tabId, (data.error as string | undefined) ?? 'Extraction failed', data.retryable !== false)
           return
         }
       }
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tabId) return t
-          const candidate = data as RecipeCandidate
+          const candidate = data as unknown as RecipeCandidate
           if (t.searchImageUrl && !candidate.image_candidates?.includes(t.searchImageUrl)) {
             const base = candidate.image_candidates ?? (candidate.image_url ? [candidate.image_url] : [])
             candidate.image_candidates = [t.searchImageUrl, ...base.filter((u) => u !== t.searchImageUrl)]
@@ -717,7 +741,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
   }
 
   function handleRequestClose() {
-    const unsaved = tabs.filter((t) => t.status !== 'saved' && t.status !== 'skipped').length
+    const unsaved = tabs.filter((t) => t.status === 'ready').length
     if (unsaved > 0) {
       setShowConfirmClose(true)
     } else {
@@ -733,7 +757,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
 
   const visibleTabs = tabs
   const activeTab = tabs.find((t) => t.id === activeTabId)
-  const unsavedCount = tabs.filter((t) => t.status !== 'saved' && t.status !== 'skipped').length
+  const unsavedCount = tabs.filter((t) => t.status === 'ready').length
   const allDone = tabs.length > 0 && unsavedCount === 0
 
   if (!open || tabs.length === 0) return null

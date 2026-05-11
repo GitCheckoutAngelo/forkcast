@@ -72,6 +72,15 @@ export async function searchWithTavily(query: string): Promise<RecipePreview[]> 
       search_depth: 'basic',
       max_results: 10,
       include_images: true,
+      exclude_domains: [
+        'youtube.com', 'youtu.be',
+        'reddit.com',
+        'facebook.com', 'fb.com',
+        'instagram.com',
+        'tiktok.com',
+        'twitter.com', 'x.com',
+        'pinterest.com', 'pinterest.co.uk',
+      ],
     }),
     signal: AbortSignal.timeout(10_000),
   })
