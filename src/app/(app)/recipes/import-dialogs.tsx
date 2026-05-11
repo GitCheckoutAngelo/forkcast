@@ -8,7 +8,9 @@ import {
   Clock,
   Globe,
   Loader2,
+  Minus,
   Search,
+  Sparkles,
   UtensilsCrossed,
   Users,
   X,
@@ -35,7 +37,7 @@ export type WalkthroughItem =
   | { type: 'ready'; label: string; candidate: RecipeCandidate }
   | { type: 'pending'; label: string; url: string; image_url?: string }
 
-type TabStatus = 'loading' | 'ready' | 'error' | 'saved'
+type TabStatus = 'loading' | 'ready' | 'error' | 'saved' | 'skipped'
 
 interface TabState {
   id: string
@@ -45,6 +47,7 @@ interface TabState {
   status: TabStatus
   candidate: RecipeCandidate | null
   error: string | null
+  retryable?: boolean
 }
 
 // ---- Helpers ----------------------------------------------------------------
@@ -108,6 +111,7 @@ interface UrlImportDialogProps {
 export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDialogProps) {
   const [url, setUrl] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingPhase, setLoadingPhase] = useState<'reading' | 'ai'>('reading')
   const [error, setError] = useState<string | null>(null)
 
   function handleClose(next: boolean) {
@@ -115,6 +119,7 @@ export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDi
       setUrl('')
       setError(null)
       setIsLoading(false)
+      setLoadingPhase('reading')
     }
     onOpenChange(next)
   }
@@ -122,16 +127,35 @@ export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDi
   async function handleImport() {
     if (!url.trim()) return
     setError(null)
+    setLoadingPhase('reading')
     setIsLoading(true)
     try {
-      const res = await fetch('/api/recipes/extract', {
+      const trimmed = url.trim()
+      // Step 1: fast path — JSON-LD only, no Claude
+      const res1 = await fetch('/api/recipes/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: trimmed, fastOnly: true }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Extraction failed')
-      onExtracted(data as RecipeCandidate)
+      const data1 = await res1.json()
+      if (!res1.ok) throw new Error(data1.error ?? 'Extraction failed')
+
+      if (!data1.fallback) {
+        onExtracted(data1 as RecipeCandidate)
+        handleClose(false)
+        return
+      }
+
+      // Step 2: AI path — JSON-LD wasn't enough, call Claude
+      setLoadingPhase('ai')
+      const res2 = await fetch('/api/recipes/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmed }),
+      })
+      const data2 = await res2.json()
+      if (!res2.ok) throw new Error(data2.error ?? 'Extraction failed')
+      onExtracted(data2 as RecipeCandidate)
       handleClose(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -163,8 +187,12 @@ export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDi
           )}
           {isLoading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              Fetching and extracting recipe…
+              {loadingPhase === 'ai'
+                ? <Sparkles className="size-3.5 shrink-0 text-primary" />
+                : <Loader2 className="size-3.5 shrink-0 animate-spin" />}
+              {loadingPhase === 'ai'
+                ? 'Analyzing with AI… this may take a moment'
+                : 'Reading page…'}
             </div>
           )}
         </div>
@@ -289,6 +317,7 @@ interface SearchImportDialogProps {
 export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImportDialogProps) {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
+  const [searchPhase, setSearchPhase] = useState<'searching' | 'ai'>('searching')
   const [isLocking, setIsLocking] = useState(false)
   const [previews, setPreviews] = useState<RecipePreview[] | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
@@ -301,6 +330,7 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
       setSelected(new Set())
       setSearchError(null)
       setIsSearching(false)
+      setSearchPhase('searching')
       setIsLocking(false)
     }
     onOpenChange(next)
@@ -308,16 +338,30 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
 
   async function handleSearch() {
     if (!query.trim() || isLocking) return
+    setSearchPhase('searching')
     setIsSearching(true)
     setPreviews(null)
     setSelected(new Set())
     setSearchError(null)
     try {
-      const res = await fetch('/api/recipes/search', {
+      const q = query.trim()
+      // Step 1: fast providers only (non-AI)
+      let res = await fetch('/api/recipes/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify({ query: q, fastOnly: true }),
       })
+
+      if (!res.ok) {
+        // Fast providers failed or unavailable — switch to AI and retry full chain
+        setSearchPhase('ai')
+        res = await fetch('/api/recipes/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q }),
+        })
+      }
+
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Search failed')
       setPreviews(data as RecipePreview[])
@@ -385,8 +429,15 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
 
         <div className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-4', isLocking && 'pointer-events-none')}>
           {isSearching && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-              {[...Array(3)].map((_, i) => <PreviewCardSkeleton key={i} />)}
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                {[...Array(3)].map((_, i) => <PreviewCardSkeleton key={i} />)}
+              </div>
+              <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                {searchPhase === 'ai'
+                  ? <><Sparkles className="size-3 text-primary" />Searching with AI… this may take a moment</>
+                  : <><Loader2 className="size-3 animate-spin" />Searching…</>}
+              </div>
             </div>
           )}
           {searchError && (
@@ -474,15 +525,27 @@ function TabLoadingContent() {
   )
 }
 
-function TabErrorContent({ error, onRetry }: { error: string; onRetry: () => void }) {
+function TabErrorContent({ error, retryable, onRetry }: { error: string; retryable: boolean; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center gap-4 py-20 text-center">
-      <AlertCircle className="size-10 text-destructive/40" />
+      <AlertCircle className={cn('size-10', retryable ? 'text-destructive/40' : 'text-amber-500/60')} />
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium">Extraction failed</p>
+        <p className="text-sm font-medium">{retryable ? 'Extraction failed' : 'Site not accessible'}</p>
         <p className="text-sm text-muted-foreground">{error}</p>
       </div>
-      <Button variant="outline" size="sm" onClick={onRetry}>Retry</Button>
+      {retryable && <Button variant="outline" size="sm" onClick={onRetry}>Retry</Button>}
+    </div>
+  )
+}
+
+function TabSkippedContent({ onInclude }: { onInclude: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-4 py-20 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+        <Minus className="size-6 text-muted-foreground" />
+      </div>
+      <p className="text-sm text-muted-foreground">Recipe skipped</p>
+      <Button variant="outline" size="sm" onClick={onInclude}>Include</Button>
     </div>
   )
 }
@@ -540,17 +603,41 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
   // is the stable trigger. eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function setTabError(tabId: string, error: string, retryable: boolean) {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, status: 'error', error, retryable } : t)),
+    )
+  }
+
   async function runExtract(tabId: string, url: string) {
     if (extractingRef.current.has(tabId)) return
     extractingRef.current.add(tabId)
     try {
-      const res = await fetch('/api/recipes/extract', {
+      // Step 1: fast path — JSON-LD only
+      let res = await fetch('/api/recipes/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, fastOnly: true }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Extraction failed')
+      let data = await res.json()
+      if (!res.ok) {
+        setTabError(tabId, data.error ?? 'Extraction failed', data.retryable !== false)
+        return
+      }
+
+      if (data.fallback) {
+        // Step 2: AI path
+        res = await fetch('/api/recipes/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        })
+        data = await res.json()
+        if (!res.ok) {
+          setTabError(tabId, data.error ?? 'Extraction failed', data.retryable !== false)
+          return
+        }
+      }
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tabId) return t
@@ -559,7 +646,6 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
             const base = candidate.image_candidates ?? (candidate.image_url ? [candidate.image_url] : [])
             candidate.image_candidates = [t.searchImageUrl, ...base.filter((u) => u !== t.searchImageUrl)]
           }
-          // Default image_url to first candidate so the picker highlights it on open
           if (candidate.image_candidates && candidate.image_candidates.length > 0) {
             candidate.image_url = candidate.image_candidates[0]
           }
@@ -567,13 +653,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
         }),
       )
     } catch (err) {
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === tabId
-            ? { ...t, status: 'error', error: err instanceof Error ? err.message : 'Extraction failed' }
-            : t,
-        ),
-      )
+      setTabError(tabId, err instanceof Error ? err.message : 'Extraction failed', true)
     } finally {
       extractingRef.current.delete(tabId)
     }
@@ -586,6 +666,17 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
     runExtract(tabId, tab.url)
   }
 
+  function handleSkipTab(tabId: string) {
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, status: 'skipped' } : t)))
+    const remaining = tabs.filter((t) => t.id !== tabId && t.status !== 'saved' && t.status !== 'skipped')
+    if (remaining.length > 0) setActiveTabId(remaining[0].id)
+  }
+
+  function handleIncludeTab(tabId: string) {
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, status: 'ready' } : t)))
+    setActiveTabId(tabId)
+  }
+
   function handleSaveTab(tabId: string, data: RecipeFormValues) {
     return new Promise<void>((resolve) => {
       startTransition(async () => {
@@ -595,9 +686,8 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
         } else {
           setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, status: 'saved' } : t)))
           setSavedCount((n) => n + 1)
-          // Auto-advance to the first unsaved tab
           const remaining = tabs.filter(
-            (t) => t.id !== tabId && t.status !== 'saved',
+            (t) => t.id !== tabId && t.status !== 'saved' && t.status !== 'skipped',
           )
           if (remaining.length > 0) setActiveTabId(remaining[0].id)
         }
@@ -607,7 +697,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
   }
 
   function handleRequestClose() {
-    const unsaved = tabs.filter((t) => t.status !== 'saved').length
+    const unsaved = tabs.filter((t) => t.status !== 'saved' && t.status !== 'skipped').length
     if (unsaved > 0) {
       setShowConfirmClose(true)
     } else {
@@ -623,7 +713,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
 
   const visibleTabs = tabs
   const activeTab = tabs.find((t) => t.id === activeTabId)
-  const unsavedCount = tabs.filter((t) => t.status !== 'saved').length
+  const unsavedCount = tabs.filter((t) => t.status !== 'saved' && t.status !== 'skipped').length
   const allDone = tabs.length > 0 && unsavedCount === 0
 
   if (!open || tabs.length === 0) return null
@@ -657,11 +747,13 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
                   ? 'border-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
                 tab.status === 'saved' && 'text-emerald-600',
+                tab.status === 'skipped' && tab.id !== activeTabId && 'opacity-40',
                 tab.status === 'error' && tab.id !== activeTabId && 'text-destructive/70',
               )}
             >
               {tab.status === 'loading' && <Loader2 className="size-3 animate-spin" />}
               {tab.status === 'saved' && <Check className="size-3 text-emerald-600" />}
+              {tab.status === 'skipped' && <Minus className="size-3 text-muted-foreground" />}
               {tab.status === 'error' && <AlertCircle className="size-3 text-destructive" />}
               <span className="max-w-[140px] truncate">{tab.label}</span>
             </button>
@@ -676,8 +768,12 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
               {tab.status === 'error' && (
                 <TabErrorContent
                   error={tab.error ?? 'Unknown error'}
+                  retryable={tab.retryable !== false}
                   onRetry={() => handleRetryTab(tab.id)}
                 />
+              )}
+              {tab.status === 'skipped' && (
+                <TabSkippedContent onInclude={() => handleIncludeTab(tab.id)} />
               )}
               {tab.status === 'saved' && (
                 <TabSavedContent name={tab.candidate?.name ?? tab.label} />
@@ -704,24 +800,29 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
               <p className="flex-1 self-center text-sm text-muted-foreground">
                 Discard {unsavedCount} unsaved {unsavedCount === 1 ? 'recipe' : 'recipes'}?
               </p>
-              <Button variant="outline" size="sm" onClick={() => setShowConfirmClose(false)}>
+              <Button key="keep-editing" variant="outline" size="sm" onClick={() => setShowConfirmClose(false)}>
                 Keep editing
               </Button>
-              <Button variant="destructive" size="sm" onClick={doClose}>
+              <Button key="discard" variant="destructive" size="sm" onClick={doClose}>
                 Discard
               </Button>
             </>
           ) : allDone ? (
-            <Button onClick={doClose} className="ml-auto">Done</Button>
+            <Button key="done" onClick={doClose} className="ml-auto">Done</Button>
           ) : (
             <>
-              <Button variant="outline" onClick={handleRequestClose} disabled={isPending} className="mr-auto">
+              <Button key="close" variant="outline" onClick={handleRequestClose} disabled={isPending} className="mr-auto">
                 Close
               </Button>
               {activeTab?.status === 'ready' && (
-                <Button type="submit" form={`recipe-form-${activeTabId}`} disabled={isPending}>
-                  {isPending ? 'Saving…' : 'Save Recipe'}
-                </Button>
+                <>
+                  <Button key="skip" variant="ghost" onClick={() => handleSkipTab(activeTabId)} disabled={isPending}>
+                    Skip
+                  </Button>
+                  <Button key="save" type="submit" form={`recipe-form-${activeTabId}`} disabled={isPending}>
+                    {isPending ? 'Saving…' : 'Save Recipe'}
+                  </Button>
+                </>
               )}
             </>
           )}

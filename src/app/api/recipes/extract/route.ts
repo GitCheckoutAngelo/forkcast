@@ -298,7 +298,7 @@ export async function POST(req: Request) {
   // serverless environments where each invocation has its own module scope.
   let semAcquired = false
   try {
-    const { url } = await req.json()
+    const { url, fastOnly } = await req.json()
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'url is required' }, { status: 400 })
     }
@@ -312,6 +312,12 @@ export async function POST(req: Request) {
         },
         signal: AbortSignal.timeout(10_000),
       })
+      if (pageRes.status === 402 || pageRes.status === 403) {
+        return NextResponse.json(
+          { error: "This site doesn't allow external access to its recipes.", retryable: false },
+          { status: 422 },
+        )
+      }
       if (!pageRes.ok) throw new Error(`HTTP ${pageRes.status}`)
       html = await pageRes.text()
     } catch (err) {
@@ -328,6 +334,11 @@ export async function POST(req: Request) {
         return NextResponse.json(candidate)
       }
       console.log(`[extract] json-ld found but incomplete (missing name/ingredients/instructions), falling back`)
+    }
+
+    // fastOnly: signal the client to switch to AI phase and re-request
+    if (fastOnly) {
+      return NextResponse.json({ fallback: true })
     }
 
     // Path 2: Claude with aggressively stripped HTML

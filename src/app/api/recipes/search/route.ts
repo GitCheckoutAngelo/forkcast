@@ -10,6 +10,9 @@ const PROVIDERS: Record<string, (query: string) => Promise<RecipePreview[]>> = {
   claude: searchWithClaude,
 }
 
+// Providers that use an LLM — used to split the fast vs AI call.
+const AI_PROVIDERS = new Set(['claude'])
+
 async function isPaywalled(url: string): Promise<boolean> {
   try {
     const res = await fetch(url, {
@@ -30,17 +33,24 @@ async function filterPaywalled(previews: RecipePreview[]): Promise<RecipePreview
 
 export async function POST(req: Request) {
   try {
-    const { query } = await req.json()
+    const { query, fastOnly } = await req.json()
     if (!query || typeof query !== 'string') {
       return NextResponse.json({ error: 'query is required' }, { status: 400 })
     }
 
     // RECIPE_SEARCH_PROVIDERS is a comma-separated priority list, e.g. "tavily,claude".
     // Each provider is tried in order; the first to succeed wins.
-    const chain = (process.env.RECIPE_SEARCH_PROVIDERS ?? 'claude')
+    // fastOnly=true skips AI providers so the client can show a phase change before retrying.
+    const fullChain = (process.env.RECIPE_SEARCH_PROVIDERS ?? 'claude')
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s in PROVIDERS)
+
+    const chain = fastOnly ? fullChain.filter((n) => !AI_PROVIDERS.has(n)) : fullChain
+
+    if (chain.length === 0) {
+      return NextResponse.json({ error: 'no_fast_providers' }, { status: 503 })
+    }
 
     let candidates: RecipePreview[] | undefined
     for (const name of chain) {
