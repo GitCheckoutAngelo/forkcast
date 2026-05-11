@@ -1,9 +1,9 @@
-import Link from 'next/link'
 import Image from 'next/image'
 import { Check, Clock, UtensilsCrossed } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { createClient } from '@/lib/supabase/server'
 import type { MacroTarget, Macros } from '@/types'
+import { NavLink } from '@/components/layout/nav-link'
 
 // ---- Types ------------------------------------------------------------------
 
@@ -437,20 +437,20 @@ export default async function Home() {
 
             {/* CTAs */}
             <div className="flex flex-wrap gap-3">
-              <Link
+              <NavLink
                 href={data.planId ? `/plans/${data.planId}?highlight=${data.today}` : '/plans'}
                 className="inline-flex items-center rounded-full px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                 style={{ backgroundColor: '#C85A1A' }}
               >
                 View today&apos;s plan
-              </Link>
-              <Link
+              </NavLink>
+              <NavLink
                 href="/recipes"
                 className="inline-flex items-center rounded-full border px-6 py-2.5 text-sm font-semibold transition-colors"
                 style={{ borderColor: '#C4A882', color: '#2C1A0E' }}
               >
                 Browse recipes
-              </Link>
+              </NavLink>
             </div>
 
             {/* Stat cards */}
@@ -490,13 +490,13 @@ export default async function Home() {
           >
             Today&apos;s meals
           </span>
-          <Link
+          <NavLink
             href={data.planId ? `/plans/${data.planId}?highlight=${data.today}&mode=edit` : '/plans'}
             className="text-sm font-medium transition-opacity hover:opacity-70"
             style={{ color: '#C85A1A' }}
           >
             Edit plan →
-          </Link>
+          </NavLink>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {data.todayMeals.map((meal) => (
@@ -515,19 +515,19 @@ export default async function Home() {
             >
               Suggested for you
             </span>
-            <Link
+            <NavLink
               href="/recipes"
               className="text-sm font-medium transition-opacity hover:opacity-70"
               style={{ color: '#C85A1A' }}
             >
               See all →
-            </Link>
+            </NavLink>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {data.suggestedRecipes.map((recipe) => (
-              <Link key={recipe.id} href={`/recipes?id=${recipe.id}`} className="group">
+              <NavLink key={recipe.id} href={`/recipes?id=${recipe.id}`} className="group">
                 <RecipeSuggestionCard {...recipe} />
-              </Link>
+              </NavLink>
             ))}
           </div>
         </div>

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sheet"
 import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { NavContext } from "./nav-context"
 
 // ── Nav progress bar ─────────────────────────────────────────────────────────
 // Shows after a 150ms delay so fast navigations don't flash a bar at all.
@@ -110,6 +111,7 @@ export default function Shell({
   const effectivePath = intendedPath ?? pathname
 
   return (
+    <NavContext.Provider value={{ startNavTransition: startTransition }}>
     <div className="min-h-screen bg-background text-foreground">
       <NavProgressBar isPending={isPending} />
 
@@ -217,5 +219,6 @@ export default function Shell({
         {children}
       </main>
     </div>
+    </NavContext.Provider>
   )
 }
