@@ -438,7 +438,7 @@ export default async function Home() {
             {/* CTAs */}
             <div className="flex flex-wrap gap-3">
               <Link
-                href={data.planId ? `/plans/${data.planId}` : '/plans'}
+                href={data.planId ? `/plans/${data.planId}?highlight=${data.today}` : '/plans'}
                 className="inline-flex items-center rounded-full px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                 style={{ backgroundColor: '#C85A1A' }}
               >
@@ -491,7 +491,7 @@ export default async function Home() {
             Today&apos;s meals
           </span>
           <Link
-            href={data.planId ? `/plans/${data.planId}?highlight=${data.today}` : '/plans'}
+            href={data.planId ? `/plans/${data.planId}?highlight=${data.today}&mode=edit` : '/plans'}
             className="text-sm font-medium transition-opacity hover:opacity-70"
             style={{ color: '#C85A1A' }}
           >

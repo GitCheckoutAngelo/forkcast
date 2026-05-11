@@ -4,7 +4,8 @@ import { withRetry } from '@/lib/anthropic/retry'
 
 const SYSTEM = `Parse each numbered ingredient line into structured JSON. Return ONLY a raw JSON array, no markdown, no explanation:
 [{"quantity":null,"unit":null,"name":"","preparation":null,"raw_text":""}]
-quantity: the primary (first/largest) measurement as a decimal number or null. unit: the unit for that primary measurement or null. name: clean ingredient name only — no quantities, units, or footnotes. preparation: any secondary measurements ("plus 1 tablespoon", "+ 2 tbsp") and how-to-prep notes ("chopped", "at room temperature") as a single string, or null — exclude parenthetical metric equivalents like "(218g)" or "(80g)" as those describe the whole ingredient not the secondary measure. For "or" alternatives keep only the first option. raw_text: original string exactly as given, unchanged.`
+quantity: the primary (first/largest) measurement as a decimal number or null. unit: the unit for that primary measurement or null. name: clean ingredient name only — no quantities, units, or footnotes. preparation: any secondary measurements ("plus 1 tablespoon", "+ 2 tbsp") and how-to-prep notes ("chopped", "at room temperature") as a single string, or null — exclude parenthetical metric equivalents like "(218g)" or "(80g)" as those describe the whole ingredient not the secondary measure. For "or" alternatives keep only the first option. raw_text: original string exactly as given, unchanged.
+Convert all imperial units to metric: oz→g (1 oz=28g), lbs→g (1 lb=454g), cups→ml (1 cup=240ml), tbsp→ml (1 tbsp=15ml), tsp→ml (1 tsp=5ml), fl oz→ml (1 fl oz=30ml), pints→ml (1 pint=480ml). Already-metric units (g, kg, ml, l) stay unchanged. Non-volume/weight units (piece, clove, bunch, slice, sprig, pinch, can, head) stay unchanged.`
 
 export async function POST(req: Request) {
   try {
