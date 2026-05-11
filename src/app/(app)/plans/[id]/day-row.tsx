@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import SlotColumn from './slot-column'
 import type { PlanDayResolved, MealSlotType } from '@/types'
 import { cn } from '@/lib/utils'
@@ -30,10 +30,12 @@ function DayRow({
   day,
   onAddClick,
   isEditMode,
+  isHighlighted = false,
 }: {
   day: PlanDayResolved
   onAddClick: (slotId: string) => void
   isEditMode: boolean
+  isHighlighted?: boolean
 }) {
   const date = new Date(day.date + 'T00:00:00')
   const dayName = SHORT_DAYS[date.getDay()]
@@ -41,12 +43,35 @@ function DayRow({
   const kcal = Math.round(day.total_macros.calories)
   const calStatus = day.target_status?.calories ?? null
 
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [flash, setFlash] = useState(isHighlighted)
+
+  useEffect(() => {
+    if (!isHighlighted) return
+    const scroll = setTimeout(() => {
+      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    const fade = setTimeout(() => setFlash(false), 800)
+    return () => { clearTimeout(scroll); clearTimeout(fade) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="flex flex-col gap-3 px-4 py-10 lg:flex-row lg:gap-4">
+    <div
+      ref={rowRef}
+      className="flex flex-col gap-3 px-4 py-10 lg:flex-row lg:gap-4 transition-[background-color] duration-[1200ms] ease-out"
+      style={{ backgroundColor: flash ? 'rgba(200, 90, 26, 0.07)' : '' }}
+    >
       {/* Day info column */}
       <div className="flex items-start justify-between gap-3 lg:w-36 lg:shrink-0 lg:flex-col lg:justify-start">
         <div>
-          <p className="font-heading text-base font-medium text-foreground">{dayName}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-heading text-base font-medium text-foreground">{dayName}</p>
+            {isHighlighted && (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ backgroundColor: 'rgba(200, 90, 26, 0.12)', color: '#C85A1A' }}>
+                Today
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">{dateLabel}</p>
         </div>
 

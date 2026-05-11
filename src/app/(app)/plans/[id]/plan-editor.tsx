@@ -559,7 +559,13 @@ export default function PlanEditor({
               {showSkeleton
                 ? plan.days.map((_, i) => <DayRowSkeleton key={i} />)
                 : augmentedDays.map((day) => (
-                    <DayRow key={day.id} day={day} onAddClick={openAddEntry} isEditMode={isEditMode} />
+                    <DayRow
+                      key={day.id}
+                      day={day}
+                      onAddClick={openAddEntry}
+                      isEditMode={isEditMode}
+                      isHighlighted={day.date === searchParams.get('highlight')}
+                    />
                   ))
               }
             </div>

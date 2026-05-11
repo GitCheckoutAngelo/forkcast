@@ -491,7 +491,7 @@ export default async function Home() {
             Today&apos;s meals
           </span>
           <Link
-            href={data.planId ? `/plans/${data.planId}` : '/plans'}
+            href={data.planId ? `/plans/${data.planId}?highlight=${data.today}` : '/plans'}
             className="text-sm font-medium transition-opacity hover:opacity-70"
             style={{ color: '#C85A1A' }}
           >
