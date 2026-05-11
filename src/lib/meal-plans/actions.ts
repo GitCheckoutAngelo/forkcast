@@ -161,6 +161,34 @@ export async function removeSnackSlot(slotId: string): Promise<{ error?: string 
   return {}
 }
 
+export async function moveMealEntry(
+  entryId: string,
+  targetSlotId: string,
+): Promise<{ error?: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const supabase = await createClient()
+
+  const { data: existing } = await supabase
+    .from('meal_entries')
+    .select('position')
+    .eq('meal_slot_id', targetSlotId)
+    .order('position', { ascending: false })
+    .limit(1)
+
+  const nextPosition =
+    existing && existing.length > 0 ? (existing[0].position as number) + 1 : 0
+
+  const { error } = await supabase
+    .from('meal_entries')
+    .update({ meal_slot_id: targetSlotId, position: nextPosition })
+    .eq('id', entryId)
+
+  if (error) return { error: error.message }
+  return {}
+}
+
 export async function addSnackSlot(
   planDayId: string
 ): Promise<{ error?: string; id?: string }> {

@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, memo, useCallback, useState, useTransition } from 'react'
+import { Fragment, memo, useCallback, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, X } from 'lucide-react'
@@ -55,8 +55,34 @@ const SlotCell = memo(function SlotCell({
     })
   }, [])
 
+  // Track entries that disappeared from this slot due to a move (not a delete).
+  // Rendered with isDeparting=true so they play the exit animation before vanishing.
+  const [departingEntries, setDepartingEntries] = useState<MealSlotResolved['entries']>([])
+  const prevEntriesRef = useRef(slot.entries)
+
+  // Derived-state pattern: detect departures during render so no frame is skipped.
+  if (slot.entries !== prevEntriesRef.current) {
+    const prev = prevEntriesRef.current
+    prevEntriesRef.current = slot.entries
+    const currIds = new Set(slot.entries.map((e) => e.id))
+    // Gone = was here, now isn't, wasn't explicitly deleted, not an optimistic placeholder.
+    const gone = prev.filter(
+      (e) => !currIds.has(e.id) && !removedEntryIds.has(e.id) && !e.id.startsWith('opt-'),
+    )
+    if (gone.length > 0) {
+      setDepartingEntries((d) => {
+        const existingIds = new Set(d.map((e) => e.id))
+        return [...d.filter((e) => currIds.has(e.id) || existingIds.has(e.id)), ...gone.filter((e) => !existingIds.has(e.id))]
+      })
+    }
+    // Also evict any departing entries that have returned to this slot (e.g. move reverted).
+    if (departingEntries.some((d) => currIds.has(d.id))) {
+      setDepartingEntries((d) => d.filter((e) => !currIds.has(e.id)))
+    }
+  }
+
   const visibleEntries = slot.entries.filter((e) => !removedEntryIds.has(e.id))
-  const isEmpty = visibleEntries.length === 0
+  const isEmpty = visibleEntries.length === 0 && departingEntries.length === 0
 
   return (
     <div
@@ -72,6 +98,20 @@ const SlotCell = memo(function SlotCell({
           entry={entry}
           isEditMode={isEditMode}
           slotType={slot.slot_type}
+          onRemove={handleEntryRemove}
+          onRestoreEntry={handleEntryRestore}
+        />
+      ))}
+      {departingEntries.map((entry) => (
+        <EntryCard
+          key={`departing-${entry.id}`}
+          entry={entry}
+          isEditMode={isEditMode}
+          slotType={slot.slot_type}
+          isDeparting
+          onDepartureComplete={(id) =>
+            setDepartingEntries((d) => d.filter((e) => e.id !== id))
+          }
           onRemove={handleEntryRemove}
           onRestoreEntry={handleEntryRestore}
         />

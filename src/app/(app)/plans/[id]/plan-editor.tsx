@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import DayRow from './day-row'
 import AddEntryDialog from './add-entry-dialog'
 import RecipeSidebar from './recipe-sidebar'
-import { updateMealPlan, addMealEntry } from '@/lib/meal-plans/actions'
+import { updateMealPlan, addMealEntry, moveMealEntry } from '@/lib/meal-plans/actions'
 import { addMacros, ZERO_MACROS } from '@/lib/meal-plans/utils'
 import type { MealPlanResolved, MealEntryResolved, MacroTarget, Recipe, FoodItem, GroceryList } from '@/types'
 import Link from 'next/link'
@@ -225,6 +225,7 @@ function ModeToggle({
 type ActiveDragItem =
   | { kind: 'recipe'; item: Recipe }
   | { kind: 'food_item'; item: FoodItem }
+  | { kind: 'entry'; entry: MealEntryResolved }
 
 const dropAnimation: DropAnimation = {
   duration: 200,
@@ -233,12 +234,25 @@ const dropAnimation: DropAnimation = {
 }
 
 const DragOverlayCard = memo(function DragOverlayCard({ item }: { item: ActiveDragItem }) {
-  const name = item.item.name
-  const kcal = Math.round(item.item.macros_per_serving.calories)
-  const sub =
-    item.kind === 'recipe'
-      ? `${kcal} kcal · ${item.item.servings} serving${item.item.servings !== 1 ? 's' : ''}`
-      : `${item.kind === 'food_item' && item.item.brand ? item.item.brand + ' · ' : ''}${kcal} kcal`
+  let name: string
+  let sub: string
+
+  if (item.kind === 'entry') {
+    const e = item.entry
+    name =
+      e.consumable.kind === 'recipe'
+        ? (e.consumable.recipe.display_name ?? e.consumable.recipe.name)
+        : e.consumable.food_item.name
+    const kcal = Math.round(e.effective_macros.calories)
+    sub = `${e.servings} ${e.servings === 1 ? 'serving' : 'servings'} · ${kcal} kcal`
+  } else {
+    name = item.item.name
+    const kcal = Math.round(item.item.macros_per_serving.calories)
+    sub =
+      item.kind === 'recipe'
+        ? `${kcal} kcal · ${item.item.servings} serving${item.item.servings !== 1 ? 's' : ''}`
+        : `${item.item.brand ? item.item.brand + ' · ' : ''}${kcal} kcal`
+  }
 
   return (
     <div className="flex w-56 cursor-grabbing items-start gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-sm shadow-lg rotate-[-2deg] scale-[1.02]">
@@ -265,6 +279,10 @@ function PlanDragOverlay({ recipes, foodItems }: { recipes: Recipe[]; foodItems:
       } else if (id.startsWith('food_item-')) {
         const item = foodItems.find((f) => f.id === id.slice('food_item-'.length))
         if (item) setActiveItem({ kind: 'food_item', item })
+      } else if (id.startsWith('entry-')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const entry = (active.data.current as any)?.entry as MealEntryResolved | undefined
+        if (entry) setActiveItem({ kind: 'entry', entry })
       }
     },
     onDragEnd()    { setActiveItem(null) },
@@ -397,6 +415,10 @@ export default function PlanEditor({
   type PendingEntry = { slotId: string; entry: MealEntryResolved }
   const [pendingEntries, setPendingEntries] = useState<PendingEntry[]>([])
 
+  // Optimistic moves: entry shown in target slot immediately; cleared on refresh.
+  type PendingMove = { entry: MealEntryResolved; toSlotId: string }
+  const [pendingMoves, setPendingMoves] = useState<PendingMove[]>([])
+
   // Detect plan identity changes during render (not in an effect).
   // Calling setState here triggers an immediate re-render before React commits to the DOM,
   // so the intermediate state where both the optimistic entry AND the real server entry
@@ -405,6 +427,7 @@ export default function PlanEditor({
   if (plan !== prevPlanRef.current) {
     prevPlanRef.current = plan
     if (pendingEntries.length > 0) setPendingEntries([])
+    if (pendingMoves.length > 0) setPendingMoves([])
   }
 
   // Merge pending entries into the plan data so DayRow children see them without
@@ -413,30 +436,48 @@ export default function PlanEditor({
   // Optimistic entries whose consumable is already present in the real slot are excluded
   // as a belt-and-suspenders guard against duplicates.
   const augmentedDays = useMemo(() => {
-    if (pendingEntries.length === 0) return plan.days
+    if (pendingEntries.length === 0 && pendingMoves.length === 0) return plan.days
+    const movedEntryIds = new Set(pendingMoves.map((m) => m.entry.id))
     return plan.days.map((day) => {
-      const affected = day.slots.some((s) => pendingEntries.some((p) => p.slotId === s.id))
+      const affected = day.slots.some(
+        (s) =>
+          pendingEntries.some((p) => p.slotId === s.id) ||
+          pendingMoves.some((m) => m.toSlotId === s.id) ||
+          s.entries.some((e) => movedEntryIds.has(e.id)),
+      )
       if (!affected) return day
       return {
         ...day,
         slots: day.slots.map((slot) => {
+          // Remove entries that have been moved away from this slot.
+          let entries = slot.entries.filter((e) => !movedEntryIds.has(e.id))
+
+          // Add optimistically-added new entries.
           const pending = pendingEntries.filter((p) => p.slotId === slot.id)
-          if (pending.length === 0) return slot
-          // Drop any optimistic entry whose consumable is already confirmed in the real data.
-          const unconfirmed = pending.filter(
-            (p) =>
-              !slot.entries.some(
-                (e) =>
-                  (p.entry.recipe_id !== null && e.recipe_id === p.entry.recipe_id) ||
-                  (p.entry.food_item_id !== null && e.food_item_id === p.entry.food_item_id),
-              ),
-          )
-          if (unconfirmed.length === 0) return slot
-          return { ...slot, entries: [...slot.entries, ...unconfirmed.map((p) => p.entry)] }
+          if (pending.length > 0) {
+            const unconfirmed = pending.filter(
+              (p) =>
+                !slot.entries.some(
+                  (e) =>
+                    (p.entry.recipe_id !== null && e.recipe_id === p.entry.recipe_id) ||
+                    (p.entry.food_item_id !== null && e.food_item_id === p.entry.food_item_id),
+                ),
+            )
+            entries = [...entries, ...unconfirmed.map((p) => p.entry)]
+          }
+
+          // Add entries that have been moved into this slot.
+          const movedIn = pendingMoves.filter((m) => m.toSlotId === slot.id)
+          if (movedIn.length > 0) {
+            entries = [...entries, ...movedIn.map((m) => ({ ...m.entry, meal_slot_id: slot.id }))]
+          }
+
+          if (entries === slot.entries) return slot
+          return { ...slot, entries }
         }),
       }
     })
-  }, [plan.days, pendingEntries])
+  }, [plan.days, pendingEntries, pendingMoves])
 
   // Stable reference so memoized DayRow/SlotColumn/SlotCell don't re-render when
   // PlanEditor re-renders for unrelated reasons (mode toggle state, skeleton, etc.)
@@ -476,6 +517,19 @@ export default function PlanEditor({
     }
   }
 
+  // Move an existing entry to a different slot, shown instantly then persisted.
+  async function moveEntryOptimistically(entry: MealEntryResolved, toSlotId: string) {
+    if (entry.meal_slot_id === toSlotId) return
+    setPendingMoves((prev) => [...prev, { entry, toSlotId }])
+    const result = await moveMealEntry(entry.id, toSlotId)
+    if (result.error) {
+      setPendingMoves((prev) => prev.filter((m) => m.entry.id !== entry.id))
+      toast.error(result.error)
+    } else {
+      startRefreshTransition(() => router.refresh())
+    }
+  }
+
   // Called by AddEntryDialog when the user picks a recipe/food item.
   // Stable reference: reads plan via ref, no dependency array needed.
   const handleAddEntry = useCallback(
@@ -508,6 +562,11 @@ export default function PlanEditor({
       const item = foodItems.find((f) => f.id === foodItemId)
       if (!item) return
       addEntryOptimistically({ kind: 'food_item', food_item: item }, slotId)
+    } else if (activeId.startsWith('entry-')) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const entry = (active.data.current as any)?.entry as MealEntryResolved | undefined
+      if (!entry) return
+      moveEntryOptimistically(entry, slotId)
     }
   }
 
