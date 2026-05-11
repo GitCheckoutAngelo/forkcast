@@ -85,10 +85,12 @@ function NewPlanDialog({
   open,
   onOpenChange,
   weekStartDay,
+  existingStartDates,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   weekStartDay: number
+  existingStartDates: Set<string>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -126,9 +128,17 @@ function NewPlanDialog({
               <SelectContent>
                 {validDates.map((d, i) => {
                   const iso = toISODate(d)
+                  const hasplan = existingStartDates.has(iso)
                   return (
-                    <SelectItem key={iso} value={iso}>
-                      {formatDateLabel(d, i === 0)}
+                    <SelectItem key={iso} value={iso} disabled={hasplan}>
+                      <span className="flex items-center justify-between gap-3 w-full">
+                        <span>{formatDateLabel(d, i === 0)}</span>
+                        {hasplan && (
+                          <span className="shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+                            planned
+                          </span>
+                        )}
+                      </span>
                     </SelectItem>
                   )
                 })}
@@ -325,6 +335,7 @@ export default function PlansClient({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         weekStartDay={weekStartDay}
+        existingStartDates={new Set(plans.map((p) => p.start_date))}
       />
 
       <Dialog

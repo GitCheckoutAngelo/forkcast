@@ -479,12 +479,39 @@ export default function PlanEditor({
     })
   }, [plan.days, pendingEntries, pendingMoves])
 
+  // Which day IDs have in-flight changes that affect that day's macro total.
+  // Same-day moves don't change the day total, so they are excluded.
+  const affectedDayIds = useMemo(() => {
+    if (pendingEntries.length === 0 && pendingMoves.length === 0) return new Set<string>()
+    const slotToDay = new Map<string, string>()
+    for (const day of plan.days) {
+      for (const slot of day.slots) slotToDay.set(slot.id, day.id)
+    }
+    const ids = new Set<string>()
+    for (const p of pendingEntries) {
+      const d = slotToDay.get(p.slotId)
+      if (d) ids.add(d)
+    }
+    for (const m of pendingMoves) {
+      const src = slotToDay.get(m.entry.meal_slot_id)
+      const dst = slotToDay.get(m.toSlotId)
+      if (src && dst && src !== dst) { ids.add(src); ids.add(dst) }
+    }
+    return ids
+  }, [plan.days, pendingEntries, pendingMoves])
+
   // Stable reference so memoized DayRow/SlotColumn/SlotCell don't re-render when
   // PlanEditor re-renders for unrelated reasons (mode toggle state, skeleton, etc.)
   const openAddEntry = useCallback((slotId: string) => {
     addEntrySlotIdRef.current = slotId
     setAddEntryOpen(true)
   }, [])
+
+  const handleRefresh = useCallback(
+    () => startRefreshTransition(() => router.refresh()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
 
   // DnD sensors – require 8px movement to start drag (avoids false triggers on click)
   const sensors = useSensors(
@@ -599,7 +626,7 @@ export default function PlanEditor({
               <p className="text-sm text-muted-foreground">
                 {formatDateRange(plan.start_date, plan.end_date)}
               </p>
-              <WeekSummary plan={plan} target={profile.macro_target} isRefreshing={isRefreshing} />
+              <WeekSummary plan={plan} target={profile.macro_target} isRefreshing={isRefreshing && pendingEntries.length > 0} />
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <ModeToggle isEditMode={toggleEditMode} onToggle={setMode} />
@@ -624,6 +651,8 @@ export default function PlanEditor({
                       onAddClick={openAddEntry}
                       isEditMode={isEditMode}
                       isHighlighted={day.date === searchParams.get('highlight')}
+                      isRefreshing={isRefreshing && affectedDayIds.has(day.id)}
+                      onRefresh={handleRefresh}
                     />
                   ))
               }

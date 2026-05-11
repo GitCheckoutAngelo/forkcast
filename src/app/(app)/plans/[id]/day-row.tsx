@@ -31,11 +31,15 @@ function DayRow({
   onAddClick,
   isEditMode,
   isHighlighted = false,
+  isRefreshing = false,
+  onRefresh,
 }: {
   day: PlanDayResolved
   onAddClick: (slotId: string) => void
   isEditMode: boolean
   isHighlighted?: boolean
+  isRefreshing?: boolean
+  onRefresh: () => void
 }) {
   const date = new Date(day.date + 'T00:00:00')
   const dayName = SHORT_DAYS[date.getDay()]
@@ -76,14 +80,17 @@ function DayRow({
         </div>
 
         {kcal > 0 && (
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 lg:mt-2">
-            <span className="text-xs text-muted-foreground tabular-nums">
+          <div className={cn(
+            'flex flex-wrap items-center gap-x-1.5 gap-y-0.5 lg:mt-2 transition-opacity duration-150',
+            isRefreshing && 'opacity-40',
+          )}>
+            <span className={cn('text-xs text-muted-foreground tabular-nums', isRefreshing && 'animate-pulse')}>
               {kcal.toLocaleString()} kcal
               {' · '}{Math.round(day.total_macros.protein_g)}g P
               {' · '}{Math.round(day.total_macros.carbs_g)}g C
               {' · '}{Math.round(day.total_macros.fat_g)}g F
             </span>
-            {calStatus && <StatusDot status={calStatus} />}
+            {calStatus && !isRefreshing && <StatusDot status={calStatus} />}
           </div>
         )}
       </div>
@@ -97,6 +104,7 @@ function DayRow({
             slotType={type}
             planDayId={day.id}
             onAddClick={onAddClick}
+            onRefresh={onRefresh}
             isEditMode={isEditMode}
           />
         ))}

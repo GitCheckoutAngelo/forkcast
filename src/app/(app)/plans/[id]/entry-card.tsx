@@ -1,7 +1,6 @@
 'use client'
 
 import { memo, useEffect, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { GripVertical, X } from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
@@ -81,6 +80,7 @@ function EntryCard({
   slotType,
   onRemove,
   onRestoreEntry,
+  onRefresh,
   isDeparting = false,
   onDepartureComplete,
 }: {
@@ -89,11 +89,11 @@ function EntryCard({
   slotType?: MealSlotType
   onRemove: (id: string) => void
   onRestoreEntry: (id: string) => void
+  onRefresh: () => void
   // isDeparting: entry was moved away from this slot; play exit animation then notify parent.
   isDeparting?: boolean
   onDepartureComplete?: (id: string) => void
 }) {
-  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [servingsInput, setServingsInput] = useState(String(entry.servings))
   const [isServingsEditing, setIsServingsEditing] = useState(false)
@@ -160,7 +160,7 @@ function EntryCard({
     startTransition(async () => {
       const result = await updateMealEntry(entry.id, { servings: next })
       if (result.error) { toast.error(result.error); setServingsInput(String(entry.servings)) }
-      else router.refresh()
+      else onRefresh()
     })
   }
 
@@ -178,7 +178,7 @@ function EntryCard({
         onRestoreEntry(entry.id)
         toast.error("Couldn't remove entry. Try again.")
       } else {
-        router.refresh()
+        onRefresh()
       }
     })
   }
@@ -205,7 +205,7 @@ function EntryCard({
               className={cn(
                 'group/entry min-h-[4rem] flex gap-1.5 border-l-[3px] py-2 pl-1.5 pr-2 transition-colors hover:bg-muted/30',
                 borderClass,
-                isPending && !isRemoving && 'opacity-60',
+                (isPending && !isRemoving) || isOptimistic ? 'opacity-60' : '',
                 isDragging && 'opacity-30',
                 !isDeparting && isEditMode && 'cursor-grab active:cursor-grabbing',
               )}
