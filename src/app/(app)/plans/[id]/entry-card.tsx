@@ -136,8 +136,11 @@ function EntryCard({
     setServingsInput(String(entry.servings))
   }
 
+  // Departing ghosts use a distinct id prefix to avoid conflicting with the live card
+  // that dnd-kit simultaneously registers in the target slot under `entry-${entry.id}`.
+  // Two draggables with the same id corrupt the DndContext registry until page reload.
   const { isDragging, setNodeRef, listeners, attributes } = useDraggable({
-    id: `entry-${entry.id}`,
+    id: isDeparting ? `departing-entry-${entry.id}` : `entry-${entry.id}`,
     data: { entry },
     disabled: !isEditMode || isPending || isOptimistic || isDeparting,
   })
@@ -197,20 +200,19 @@ function EntryCard({
           <div className="min-h-0 overflow-hidden">
             <div
               ref={setNodeRef}
+              {...listeners}
               {...attributes}
               className={cn(
                 'group/entry min-h-[4rem] flex gap-1.5 border-l-[3px] py-2 pl-1.5 pr-2 transition-colors hover:bg-muted/30',
                 borderClass,
                 isPending && !isRemoving && 'opacity-60',
                 isDragging && 'opacity-30',
+                !isDeparting && isEditMode && 'cursor-grab active:cursor-grabbing',
               )}
               aria-busy={isPending}
             >
-              <div
-                {...listeners}
-                className="shrink-0 cursor-grab self-center text-muted-foreground/40 opacity-0 transition-opacity group-hover/entry:opacity-100 focus:opacity-100 active:cursor-grabbing touch-none"
-                aria-label="Drag to move"
-              >
+              {/* Visual grip hint — no listeners, whole card is the drag target */}
+              <div className="shrink-0 self-center text-muted-foreground/40 opacity-0 transition-opacity group-hover/entry:opacity-100 touch-none">
                 <GripVertical className="size-3.5" />
               </div>
 
