@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import {
   useForm,
   useFieldArray,
@@ -514,6 +514,7 @@ interface RecipeFormProps {
   isSubmitting?: boolean
   formId?: string
   imageCandidates?: string[]
+  autoReparseIngredients?: boolean
 }
 
 export { toFormValues }
@@ -527,7 +528,7 @@ const SECTIONS: { id: FormSection; label: string }[] = [
   { id: 'nutrition', label: 'Nutrition' },
 ]
 
-export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-form', imageCandidates }: RecipeFormProps) {
+export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-form', imageCandidates, autoReparseIngredients }: RecipeFormProps) {
   const [section, setSection] = useState<FormSection>('overview')
   const [visited, setVisited] = useState<Set<FormSection>>(new Set(['overview']))
 
@@ -566,6 +567,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
   // Re-parse ingredients state
   const [isReparsing, setIsReparsing] = useState(false)
   const [reparseError, setReparseError] = useState<string | null>(null)
+  const autoReparseFiredRef = useRef(false)
 
   async function handleReparseIngredients() {
     setIsReparsing(true)
@@ -608,6 +610,14 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
       setIsReparsing(false)
     }
   }
+
+  // Auto-trigger re-parse on first mount when the candidate came from the non-AI (JSON-LD) path.
+  useEffect(() => {
+    if (!autoReparseIngredients || autoReparseFiredRef.current) return
+    autoReparseFiredRef.current = true
+    handleReparseIngredients()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Recalculate macros state
   const [isCalculating, setIsCalculating] = useState(false)

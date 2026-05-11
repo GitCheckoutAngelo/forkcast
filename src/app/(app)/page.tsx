@@ -105,6 +105,7 @@ async function getDashboardData(userId: string) {
     macroTarget: (profile?.macro_target as MacroTarget | null) ?? null,
     caloriesPlanned: 0,
     mealCount: 0,
+    snackCount: 0,
     daysPlannedThisWeek: 0,
     planId: null as string | null,
     tz,
@@ -136,6 +137,7 @@ async function getDashboardData(userId: string) {
 
   let caloriesPlanned = 0
   let mealCount = 0
+  let snackCount = 0
   const mealSlotMap = new Map<string, { name: string | null; calories: number }>()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,7 +150,8 @@ async function getDashboardData(userId: string) {
     let firstName: string | null = null
 
     for (const entry of entries) {
-      mealCount++
+      if (slotType === 'snack') snackCount++
+      else mealCount++
       const macros: Macros | null =
         entry.macros_override ??
         entry.recipe?.macros_per_serving ??
@@ -197,6 +200,7 @@ async function getDashboardData(userId: string) {
     ...base,
     caloriesPlanned: Math.round(caloriesPlanned),
     mealCount,
+    snackCount,
     daysPlannedThisWeek,
     planId: plan.id,
     todayMeals,
@@ -429,9 +433,13 @@ export default async function Home() {
                 <span style={{ color: '#C85A1A' }}>{firstName}.</span>
               </h1>
               <p className="text-base" style={{ color: '#6B5040' }}>
-                {data.mealCount === 0
+                {data.mealCount === 0 && data.snackCount === 0
                   ? 'No meals planned yet today.'
-                  : `You have ${data.mealCount} ${data.mealCount === 1 ? 'meal' : 'meals'} planned today.`}
+                  : [
+                      data.mealCount > 0 && `${data.mealCount} ${data.mealCount === 1 ? 'meal' : 'meals'}`,
+                      data.snackCount > 0 && `${data.snackCount} ${data.snackCount === 1 ? 'snack' : 'snacks'}`,
+                    ].filter(Boolean).join(' · ') + ' planned today.'
+              }
               </p>
             </div>
 
@@ -463,7 +471,11 @@ export default async function Home() {
               <StatCard
                 label="Meals today"
                 value={data.mealCount > 0 ? String(data.mealCount) : '—'}
-                sub={data.mealCount === 0 ? 'none yet' : data.mealCount === 1 ? '1 planned' : 'planned'}
+                sub={data.mealCount === 0 && data.snackCount === 0
+                  ? 'none yet'
+                  : data.snackCount > 0
+                    ? `${data.snackCount} ${data.snackCount === 1 ? 'snack' : 'snacks'}`
+                    : 'planned'}
               />
               <StatCard
                 label="Days planned"

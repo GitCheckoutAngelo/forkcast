@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils'
 // ---- Types ------------------------------------------------------------------
 
 export type WalkthroughItem =
-  | { type: 'ready'; label: string; candidate: RecipeCandidate }
+  | { type: 'ready'; label: string; candidate: RecipeCandidate; fromFastPath?: boolean }
   | { type: 'pending'; label: string; url: string; image_url?: string }
 
 type TabStatus = 'loading' | 'ready' | 'error' | 'saved' | 'skipped'
@@ -49,6 +49,7 @@ interface TabState {
   candidate: RecipeCandidate | null
   error: string | null
   retryable?: boolean
+  autoReparseIngredients?: boolean
 }
 
 // ---- Helpers ----------------------------------------------------------------
@@ -106,7 +107,7 @@ function DeferredMount({ children }: { children: React.ReactNode }) {
 interface UrlImportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onExtracted: (candidate: RecipeCandidate) => void
+  onExtracted: (candidate: RecipeCandidate, fromFastPath: boolean) => void
 }
 
 export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDialogProps) {
@@ -142,7 +143,7 @@ export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDi
       if (!res1.ok) throw new Error(data1.error ?? 'Extraction failed')
 
       if (!data1.fallback) {
-        onExtracted(data1 as RecipeCandidate)
+        onExtracted(data1 as RecipeCandidate, true)
         handleClose(false)
         return
       }
@@ -156,7 +157,7 @@ export function UrlImportDialog({ open, onOpenChange, onExtracted }: UrlImportDi
       })
       const data2 = await res2.json()
       if (!res2.ok) throw new Error(data2.error ?? 'Extraction failed')
-      onExtracted(data2 as RecipeCandidate)
+      onExtracted(data2 as RecipeCandidate, false)
       handleClose(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -607,6 +608,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
       status: item.type === 'ready' ? 'ready' : 'loading',
       candidate: item.type === 'ready' ? item.candidate : null,
       error: null,
+      autoReparseIngredients: item.type === 'ready' ? (item.fromFastPath ?? false) : false,
     }))
     setTabs(newTabs)
     setActiveTabId(newTabs[0]?.id ?? '')
@@ -641,7 +643,9 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
         return
       }
 
+      let fromFastPath = true
       if (data.fallback) {
+        fromFastPath = false
         // Step 2: AI path
         res = await fetch('/api/recipes/extract', {
           method: 'POST',
@@ -665,7 +669,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
           if (candidate.image_candidates && candidate.image_candidates.length > 0) {
             candidate.image_url = candidate.image_candidates[0]
           }
-          return { ...t, status: 'ready', candidate, error: null }
+          return { ...t, status: 'ready', candidate, error: null, autoReparseIngredients: fromFastPath }
         }),
       )
     } catch (err) {
@@ -807,6 +811,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
                     imageCandidates={tab.candidate.image_candidates}
                     onSubmit={(data) => handleSaveTab(tab.id, data)}
                     isSubmitting={isPending}
+                    autoReparseIngredients={tab.autoReparseIngredients}
                   />
                 </DeferredMount>
               )}

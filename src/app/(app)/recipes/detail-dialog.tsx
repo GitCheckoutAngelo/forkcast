@@ -116,7 +116,7 @@ export default function DetailDialog({
         </div>
 
         {/* Title + tabs */}
-        <div className="shrink-0 border-b px-6 pb-0 pt-4">
+        <div className="shrink-0 px-6 pb-0 pt-4">
           <DialogTitle className="mb-3 pr-6 text-xl">{recipe.name}</DialogTitle>
           <div className="relative flex rounded-lg bg-muted p-1">
             <div
