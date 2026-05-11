@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronDown, Link, Plus, Search, SearchIcon, UtensilsCrossed, X } from 'lucide-react'
 import {
@@ -66,6 +66,15 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
   const [walkthroughItems, setWalkthroughItems] = useState<WalkthroughItem[] | null>(null)
 
   const [isPending, startTransition] = useTransition()
+
+  // Auto-open detail dialog when navigated to with ?id=
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const id = searchParams.get('id')
+    if (!id) return
+    const recipe = recipes.find((r) => r.id === id)
+    if (recipe) { setActiveRecipe(recipe); setDialog('detail') }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dialog helpers
   function openCreate() { setDialog('create') }

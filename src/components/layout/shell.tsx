@@ -116,7 +116,8 @@ export default function Shell({
       <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-semibold tracking-tight text-foreground font-heading sm:text-2xl">
+            <Link href="/" className="flex items-center gap-2 font-heading text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+              <img src="/favicon.svg" alt="" aria-hidden="true" className="size-6 sm:size-7" />
               Forkcast
             </Link>
             <nav className="hidden items-center gap-3 md:flex">

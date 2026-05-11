@@ -19,6 +19,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Forkcast",
   description: "Plan your meals, hit your macros",
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({

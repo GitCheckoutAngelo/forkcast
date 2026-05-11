@@ -42,8 +42,9 @@ function getValidStartDates(weekStartDay: number, count = 10): Date[] {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const dates: Date[] = []
+  // Start from the most recent weekStartDay (may be today or in the past)
   const d = new Date(today)
-  while (d.getDay() !== weekStartDay) d.setDate(d.getDate() + 1)
+  while (d.getDay() !== weekStartDay) d.setDate(d.getDate() - 1)
   for (let i = 0; i < count; i++) {
     dates.push(new Date(d))
     d.setDate(d.getDate() + 7)
@@ -67,8 +68,9 @@ function formatDateRange(start: string, end: string): string {
   return `${MONTH_NAMES[s.getMonth()]} ${s.getDate()} – ${MONTH_NAMES[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`
 }
 
-function formatDateLabel(d: Date): string {
-  return `${FULL_DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+function formatDateLabel(d: Date, isCurrentWeek = false): string {
+  const base = `${FULL_DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+  return isCurrentWeek ? `${base} (this week)` : base
 }
 
 function planDisplayName(plan: MealPlanSummary): string {
@@ -119,14 +121,14 @@ function NewPlanDialog({
             <Label htmlFor="plan-start">Start date</Label>
             <Select value={selectedDate} onValueChange={(v) => { if (v) setSelectedDate(v) }}>
               <SelectTrigger id="plan-start" className="w-full">
-                <SelectValue>{formatDateLabel(new Date(selectedDate + 'T00:00:00'))}</SelectValue>
+                <SelectValue>{formatDateLabel(new Date(selectedDate + 'T00:00:00'), selectedDate === toISODate(validDates[0]))}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {validDates.map((d) => {
+                {validDates.map((d, i) => {
                   const iso = toISODate(d)
                   return (
                     <SelectItem key={iso} value={iso}>
-                      {formatDateLabel(d)}
+                      {formatDateLabel(d, i === 0)}
                     </SelectItem>
                   )
                 })}
