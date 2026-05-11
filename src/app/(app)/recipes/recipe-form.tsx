@@ -517,7 +517,18 @@ interface RecipeFormProps {
 
 export { toFormValues }
 
+type FormSection = 'overview' | 'ingredients' | 'instructions' | 'nutrition'
+
+const SECTIONS: { id: FormSection; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'ingredients', label: 'Ingredients' },
+  { id: 'instructions', label: 'Instructions' },
+  { id: 'nutrition', label: 'Nutrition' },
+]
+
 export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-form', imageCandidates }: RecipeFormProps) {
+  const [section, setSection] = useState<FormSection>('overview')
+
   const {
     register,
     control,
@@ -707,13 +718,42 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
 
   return (
     <>
-    <form id={formId} onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
-      {/* Basic Info */}
-      <div className="flex flex-col gap-4">
+    <form id={formId} onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-0">
+      {/* Section tabs */}
+      <div className="relative mb-6 flex rounded-lg bg-muted p-1">
+        <div
+          className="pointer-events-none absolute inset-y-1 rounded-md bg-background shadow-sm transition-all duration-200 ease-in-out"
+          style={{
+            width: 'calc((100% - 8px) / 4)',
+            left: `calc(4px + ${SECTIONS.findIndex((s) => s.id === section)} * ((100% - 8px) / 4))`,
+          }}
+        />
+        {SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setSection(s.id)}
+            className={cn(
+              'relative z-10 flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+              section === s.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview */}
+      <div className={cn('flex flex-col gap-4', section !== 'overview' && 'hidden')}>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="rf-name">Name *</Label>
           <Input id="rf-name" aria-invalid={!!errors.name} {...register('name')} />
           {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rf-description">Description</Label>
+          <Textarea id="rf-description" className="resize-none" {...register('description')} />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -726,7 +766,6 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
               onSelect={(url) => setValue('image_url', url, { shouldValidate: true })}
             />
           )}
-          {/* Isolated: only re-renders when image_url changes, debounced 500ms */}
           <ImagePreview control={control} />
         </div>
 
@@ -757,158 +796,27 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="rf-cuisine">Cuisine</Label>
-          <Input
-            id="rf-cuisine"
-            placeholder="e.g. Filipino, Italian"
-            {...register('cuisine')}
-          />
+          <Input id="rf-cuisine" placeholder="e.g. Filipino, Italian" {...register('cuisine')} />
         </div>
-      </div>
 
-      {/* Isolated: only re-renders when meal_types changes */}
-      <MealTypeSelector control={control} onToggle={toggleMealType} />
+        <MealTypeSelector control={control} onToggle={toggleMealType} />
+        <TagsInput control={control} onAdd={addTag} onRemove={removeTag} />
 
-      {/* Isolated: only re-renders when tags changes */}
-      <TagsInput control={control} onAdd={addTag} onRemove={removeTag} />
-
-      {/* Description */}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="rf-description">Description</Label>
-        <Textarea id="rf-description" className="resize-none" {...register('description')} />
-      </div>
-
-      {/* Macros */}
-      <div className="flex flex-col gap-3">
-        {/* Header: label + recalculate button */}
-        <div className="flex items-center justify-between gap-2">
-          <Label>Macros per serving</Label>
-          <span
-            title={!canRecalculate ? 'Add at least 2 ingredients to recalculate' : undefined}
-            className={!canRecalculate ? 'cursor-not-allowed' : undefined}
-          >
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!canRecalculate || isCalculating}
-              onClick={handleRecalculate}
-            >
-              {isCalculating ? (
-                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="mr-1.5 size-3.5" />
-              )}
-              {isCalculating ? 'Calculating…' : 'Recalculate from ingredients'}
-            </Button>
-          </span>
-        </div>
-        {calcError && <p className="text-xs text-destructive">{calcError}</p>}
-
-        {/* Panel: mirrors detail-dialog layout */}
-        <div className="rounded-xl border border-border bg-muted/30">
-          {/* Calories — full-width headline row */}
-          <div className="flex flex-col items-center px-4 pb-3 pt-4">
-            <div className="flex items-baseline gap-1.5">
-              <Input
-                id="rf-calories"
-                type="number"
-                min="0"
-                step="0.1"
-                aria-invalid={!!errors.macros_per_serving?.calories}
-                className="h-10 w-28 text-center text-xl font-heading font-semibold sm:text-2xl"
-                {...register('macros_per_serving.calories')}
-              />
-              <span className="text-base text-muted-foreground">kcal</span>
-            </div>
-            <Label
-              htmlFor="rf-calories"
-              className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground"
-            >
-              Calories
-            </Label>
+        <div className="flex flex-col gap-3">
+          <Label>Source (optional)</Label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="rf-source-url" className="text-xs">URL</Label>
+            <Input id="rf-source-url" type="url" placeholder="https://…" {...register('source_url')} />
           </div>
-
-          {/* Divider */}
-          <div className="border-b border-border/40" />
-
-          {/* 2×3 macro grid */}
-          <div className="grid grid-cols-3">
-            {(
-              [
-                ['protein_g', 'Protein', 'g'],
-                ['carbs_g', 'Carbs', 'g'],
-                ['fat_g', 'Fat', 'g'],
-              ] as const
-            ).map(([key, label, unit]) => (
-              <div key={key} className="flex flex-col items-center px-2 py-3">
-                <div className="flex items-baseline gap-0.5">
-                  <Input
-                    id={`rf-${key}`}
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    aria-invalid={!!errors.macros_per_serving?.[key]}
-                    className="h-7 w-full min-w-0 flex-1 px-1 text-center font-heading font-semibold"
-                    {...register(`macros_per_serving.${key}`)}
-                  />
-                  <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
-                </div>
-                <Label
-                  htmlFor={`rf-${key}`}
-                  className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground"
-                >
-                  {label}
-                </Label>
-              </div>
-            ))}
-            {(
-              [
-                ['fiber_g', 'Fiber', 'g'],
-                ['sugar_g', 'Sugar', 'g'],
-                ['sodium_mg', 'Sodium', 'mg'],
-              ] as const
-            ).map(([key, label, unit]) => (
-              <div key={key} className="flex flex-col items-center px-2 py-3">
-                <div className="flex items-baseline gap-0.5">
-                  <Input
-                    id={`rf-${key}`}
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    placeholder="—"
-                    className="h-7 w-full min-w-0 flex-1 px-1 text-center font-heading font-semibold"
-                    {...register(`macros_per_serving.${key}`)}
-                  />
-                  <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
-                </div>
-                <Label
-                  htmlFor={`rf-${key}`}
-                  className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground"
-                >
-                  {label}
-                </Label>
-              </div>
-            ))}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="rf-site-name" className="text-xs">Site Name</Label>
+            <Input id="rf-site-name" placeholder="e.g. Serious Eats" {...register('source_site_name')} />
           </div>
         </div>
-
-        <Controller
-          name="macros_verified"
-          control={control}
-          render={({ field }) => (
-            <label className="flex cursor-pointer items-center gap-2">
-              <Checkbox
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked)}
-              />
-              <span className="text-sm">Macros verified from source</span>
-            </label>
-          )}
-        />
       </div>
 
       {/* Ingredients */}
-      <div className="flex flex-col gap-3">
+      <div className={cn('flex flex-col gap-3', section !== 'ingredients' && 'hidden')}>
         <div className="flex items-center justify-between gap-2">
           <Label>Ingredients</Label>
           <Button
@@ -918,33 +826,16 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
             disabled={ingredientFields.length === 0 || isReparsing}
             onClick={handleReparseIngredients}
           >
-            {isReparsing ? (
-              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="mr-1.5 size-3.5" />
-            )}
+            {isReparsing ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Sparkles className="mr-1.5 size-3.5" />}
             {isReparsing ? 'Parsing…' : 'Re-parse with AI'}
           </Button>
         </div>
         {reparseError && <p className="text-xs text-destructive">{reparseError}</p>}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleIngredientDragEnd}
-        >
-          <SortableContext
-            items={ingredientFields.map((f) => f.id)}
-            strategy={verticalListSortingStrategy}
-          >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIngredientDragEnd}>
+          <SortableContext items={ingredientFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-2">
               {ingredientFields.map((field, index) => (
-                <SortableIngredientRow
-                  key={field.id}
-                  id={field.id}
-                  index={index}
-                  register={register}
-                  onRemove={removeIngredient}
-                />
+                <SortableIngredientRow key={field.id} id={field.id} index={index} register={register} onRemove={removeIngredient} />
               ))}
             </div>
           </SortableContext>
@@ -954,9 +845,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
           variant="outline"
           size="sm"
           className="self-start"
-          onClick={() =>
-            appendIngredient({ quantity: null, unit: '', name: '', preparation: '', raw_text: '' })
-          }
+          onClick={() => appendIngredient({ quantity: null, unit: '', name: '', preparation: '', raw_text: '' })}
         >
           <Plus className="mr-1 size-3.5" />
           Add Ingredient
@@ -964,26 +853,13 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
       </div>
 
       {/* Instructions */}
-      <div className="flex flex-col gap-3">
+      <div className={cn('flex flex-col gap-3', section !== 'instructions' && 'hidden')}>
         <Label>Instructions</Label>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleInstructionDragEnd}
-        >
-          <SortableContext
-            items={instructionFields.map((f) => f.id)}
-            strategy={verticalListSortingStrategy}
-          >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleInstructionDragEnd}>
+          <SortableContext items={instructionFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-2">
               {instructionFields.map((field, index) => (
-                <SortableInstructionRow
-                  key={field.id}
-                  id={field.id}
-                  index={index}
-                  register={register}
-                  onRemove={removeInstruction}
-                />
+                <SortableInstructionRow key={field.id} id={field.id} index={index} register={register} onRemove={removeInstruction} />
               ))}
             </div>
           </SortableContext>
@@ -1000,28 +876,104 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
         </Button>
       </div>
 
-      {/* Source */}
-      <div className="flex flex-col gap-3">
-        <Label>Source (optional)</Label>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="rf-source-url" className="text-xs">URL</Label>
-            <Input
-              id="rf-source-url"
-              type="url"
-              placeholder="https://…"
-              {...register('source_url')}
-            />
+      {/* Nutrition */}
+      <div className={cn('flex flex-col gap-3', section !== 'nutrition' && 'hidden')}>
+        <div className="flex items-center justify-between gap-2">
+          <Label>Macros per serving</Label>
+          <span
+            title={!canRecalculate ? 'Add at least 2 ingredients to recalculate' : undefined}
+            className={!canRecalculate ? 'cursor-not-allowed' : undefined}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!canRecalculate || isCalculating}
+              onClick={handleRecalculate}
+            >
+              {isCalculating ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Sparkles className="mr-1.5 size-3.5" />}
+              {isCalculating ? 'Calculating…' : 'Recalculate from ingredients'}
+            </Button>
+          </span>
+        </div>
+        {calcError && <p className="text-xs text-destructive">{calcError}</p>}
+
+        <div className="rounded-xl border border-border bg-muted/30">
+          <div className="flex flex-col items-center px-4 pb-3 pt-4">
+            <div className="flex items-baseline gap-1.5">
+              <Input
+                id="rf-calories"
+                type="number"
+                min="0"
+                step="0.1"
+                aria-invalid={!!errors.macros_per_serving?.calories}
+                className="h-10 w-28 text-center text-xl font-heading font-semibold sm:text-2xl"
+                {...register('macros_per_serving.calories')}
+              />
+              <span className="text-base text-muted-foreground">kcal</span>
+            </div>
+            <Label htmlFor="rf-calories" className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground">
+              Calories
+            </Label>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="rf-site-name" className="text-xs">Site Name</Label>
-            <Input
-              id="rf-site-name"
-              placeholder="e.g. Serious Eats"
-              {...register('source_site_name')}
-            />
+
+          <div className="border-b border-border/40" />
+
+          <div className="grid grid-cols-3">
+            {(['protein_g', 'carbs_g', 'fat_g'] as const).map((key) => {
+              const label = key === 'protein_g' ? 'Protein' : key === 'carbs_g' ? 'Carbs' : 'Fat'
+              return (
+                <div key={key} className="flex flex-col items-center px-2 py-3">
+                  <div className="flex items-baseline gap-0.5">
+                    <Input
+                      id={`rf-${key}`}
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      aria-invalid={!!errors.macros_per_serving?.[key]}
+                      className="h-7 w-full min-w-0 flex-1 px-1 text-center font-heading font-semibold"
+                      {...register(`macros_per_serving.${key}`)}
+                    />
+                    <span className="shrink-0 text-xs text-muted-foreground">g</span>
+                  </div>
+                  <Label htmlFor={`rf-${key}`} className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {label}
+                  </Label>
+                </div>
+              )
+            })}
+            {([['fiber_g', 'Fiber', 'g'], ['sugar_g', 'Sugar', 'g'], ['sodium_mg', 'Sodium', 'mg']] as const).map(([key, label, unit]) => (
+              <div key={key} className="flex flex-col items-center px-2 py-3">
+                <div className="flex items-baseline gap-0.5">
+                  <Input
+                    id={`rf-${key}`}
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="—"
+                    className="h-7 w-full min-w-0 flex-1 px-1 text-center font-heading font-semibold"
+                    {...register(`macros_per_serving.${key}`)}
+                  />
+                  <span className="shrink-0 text-xs text-muted-foreground">{unit}</span>
+                </div>
+                <Label htmlFor={`rf-${key}`} className="mt-1 cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {label}
+                </Label>
+              </div>
+            ))}
           </div>
         </div>
+
+        <Controller
+          name="macros_verified"
+          control={control}
+          render={({ field }) => (
+            <label className="flex cursor-pointer items-center gap-2">
+              <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked)} />
+              <span className="text-sm">Macros verified from source</span>
+            </label>
+          )}
+        />
       </div>
     </form>
     {calcState && (
