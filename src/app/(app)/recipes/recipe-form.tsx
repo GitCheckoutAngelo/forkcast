@@ -27,7 +27,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Loader2, Plus, Sparkles, X } from 'lucide-react'
+import { Check, GripVertical, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -115,6 +115,47 @@ const DEFAULT_VALUES: RecipeFormValues = {
 // ---- Isolated sub-components ------------------------------------------------
 // Each uses useWatch internally so only IT re-renders when its field changes.
 
+function ImageCandidatePicker({
+  control,
+  candidates,
+  onSelect,
+}: {
+  control: Control<RecipeFormValues>
+  candidates: string[]
+  onSelect: (url: string) => void
+}) {
+  const current = useWatch({ control, name: 'image_url' }) ?? ''
+  return (
+    <div className="flex flex-wrap gap-2 pt-1">
+      {candidates.map((url, i) => {
+        const selected = current === url
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSelect(url)}
+            className={cn(
+              'relative h-16 w-16 overflow-hidden rounded-lg border-2 transition-all',
+              selected
+                ? 'border-primary'
+                : 'border-border hover:border-foreground/40',
+            )}
+          >
+            <img src={url} alt={`Image option ${i + 1}`} className="h-full w-full object-cover" />
+            {selected && (
+              <div className="absolute inset-0 flex items-end justify-end bg-primary/20 p-1">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </div>
+              </div>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function ImagePreview({ control }: { control: Control<RecipeFormValues> }) {
   const url = useWatch({ control, name: 'image_url' }) ?? ''
   const [debouncedUrl, setDebouncedUrl] = useState(url)
@@ -130,7 +171,7 @@ function ImagePreview({ control }: { control: Control<RecipeFormValues> }) {
   return (
     <div className="mt-1">
       {!imgError ? (
-        <div className="h-32 overflow-hidden rounded-lg border border-border">
+        <div className="h-52 overflow-hidden rounded-lg border border-border">
           {/* key forces img remount when URL changes, clearing stale onError */}
           <img
             key={debouncedUrl}
@@ -471,11 +512,12 @@ interface RecipeFormProps {
   onSubmit: (data: RecipeFormValues) => Promise<void>
   isSubmitting?: boolean
   formId?: string
+  imageCandidates?: string[]
 }
 
 export { toFormValues }
 
-export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-form' }: RecipeFormProps) {
+export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-form', imageCandidates }: RecipeFormProps) {
   const {
     register,
     control,
@@ -677,6 +719,13 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="rf-image">Image URL</Label>
           <Input id="rf-image" type="url" placeholder="https://…" {...register('image_url')} />
+          {imageCandidates && imageCandidates.length > 1 && (
+            <ImageCandidatePicker
+              control={control}
+              candidates={imageCandidates}
+              onSelect={(url) => setValue('image_url', url, { shouldValidate: true })}
+            />
+          )}
           {/* Isolated: only re-renders when image_url changes, debounced 500ms */}
           <ImagePreview control={control} />
         </div>

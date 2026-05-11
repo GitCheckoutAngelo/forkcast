@@ -1,0 +1,270 @@
+{
+    "@context": "https://schema.org",
+    "@graph": [
+        {
+            "@type": [
+                "Person",
+                "Organization"
+            ],
+            "@id": "https://thekoreanvegan.com/#person",
+            "name": "The Korean Vegan",
+            "logo": {
+                "@type": "ImageObject",
+                "@id": "https://thekoreanvegan.com/#logo",
+                "url": "https://thekoreanvegan.com/wp-content/uploads/2024/12/The-Korean-Vegan-Logo.png",
+                "contentUrl": "https://thekoreanvegan.com/wp-content/uploads/2024/12/The-Korean-Vegan-Logo.png",
+                "caption": "The Korean Vegan",
+                "inLanguage": "en-US",
+                "width": "696",
+                "height": "696"
+            },
+            "image": {
+                "@type": "ImageObject",
+                "@id": "https://thekoreanvegan.com/#logo",
+                "url": "https://thekoreanvegan.com/wp-content/uploads/2024/12/The-Korean-Vegan-Logo.png",
+                "contentUrl": "https://thekoreanvegan.com/wp-content/uploads/2024/12/The-Korean-Vegan-Logo.png",
+                "caption": "The Korean Vegan",
+                "inLanguage": "en-US",
+                "width": "696",
+                "height": "696"
+            }
+        },
+        {
+            "@type": "WebSite",
+            "@id": "https://thekoreanvegan.com/#website",
+            "url": "https://thekoreanvegan.com",
+            "name": "The Korean Vegan",
+            "alternateName": "TKV",
+            "publisher": {
+                "@id": "https://thekoreanvegan.com/#person"
+            },
+            "inLanguage": "en-US"
+        },
+        {
+            "@type": "ImageObject",
+            "@id": "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-1.jpg",
+            "url": "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-1.jpg",
+            "width": "1200",
+            "height": "675",
+            "caption": "A close-up view of freshly baked, golden brown vegan salt bread rolls with a shiny, glazed surface and a sprinkle of sugar on top, arranged closely together—a perfect easy salt bread recipe.",
+            "inLanguage": "en-US"
+        },
+        {
+            "@type": "BreadcrumbList",
+            "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#breadcrumb",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": "1",
+                    "item": {
+                        "@id": "https://thekoreanvegan.com",
+                        "name": "Home"
+                    }
+                },
+                {
+                    "@type": "ListItem",
+                    "position": "2",
+                    "item": {
+                        "@id": "https://thekoreanvegan.com/category/food/",
+                        "name": "Recipes"
+                    }
+                },
+                {
+                    "@type": "ListItem",
+                    "position": "3",
+                    "item": {
+                        "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/",
+                        "name": "How to Make Viral Salt Bread Recipe (Easy and Vegan)."
+                    }
+                }
+            ]
+        },
+        {
+            "@type": [
+                "WebPage",
+                "FAQPage"
+            ],
+            "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#webpage",
+            "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/",
+            "name": "How To Make Viral Salt Bread Recipe (Easy And Vegan). - The Korean Vegan",
+            "datePublished": "2026-02-25T06:06:08-08:00",
+            "dateModified": "2026-02-26T08:34:11-08:00",
+            "isPartOf": {
+                "@id": "https://thekoreanvegan.com/#website"
+            },
+            "primaryImageOfPage": {
+                "@id": "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-1.jpg"
+            },
+            "inLanguage": "en-US",
+            "breadcrumb": {
+                "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#breadcrumb"
+            },
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#faq-question-1709691337802",
+                    "name": "Can I make this vegan salt bread recipe with gluten-free flour?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "I have not tested this salt bread recipe with gluten-free flour, but if you have a solid, reliable gluten-free <em>bread flour</em> blend you've used in the past for bread, give it a try! "
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#faq-question-1709691357948",
+                    "name": "Can I use coconut oil instead of vegan butter?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "I have not tested this salt bread recipe with coconut oil. However, you can try making this recipe using coconut oil that is solid at room temperature. You may have trouble shaping the \"blocks\" necessary to roll them and you will likely not achieve the massive holes running through the centers of each roll (since the oil will melt too quickly), but you should still have delicious rolls."
+                    }
+                }
+            ]
+        },
+        {
+            "@type": "Person",
+            "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#author",
+            "name": "Joanne Molinaro",
+            "image": {
+                "@type": "ImageObject",
+                "@id": "https://secure.gravatar.com/avatar/cbc686377ce52a1afc152b119d3ca78af89587f408f011cc801b8dd4c3538057?s=96&amp;d=mm&amp;r=g",
+                "url": "https://secure.gravatar.com/avatar/cbc686377ce52a1afc152b119d3ca78af89587f408f011cc801b8dd4c3538057?s=96&amp;d=mm&amp;r=g",
+                "caption": "Joanne Molinaro",
+                "inLanguage": "en-US"
+            }
+        },
+        {
+            "@type": "BlogPosting",
+            "headline": "How To Make Viral Salt Bread Recipe (Easy And Vegan). - The Korean Vegan",
+            "keywords": "salt bread recipe",
+            "datePublished": "2026-02-25T06:06:08-08:00",
+            "dateModified": "2026-02-26T08:34:11-08:00",
+            "articleSection": "Bread &amp; Breakfast, Comfort Foods, Featured, Recipes, Sides",
+            "author": {
+                "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#author",
+                "name": "Joanne Molinaro"
+            },
+            "publisher": {
+                "@id": "https://thekoreanvegan.com/#person"
+            },
+            "description": "This vegan take on the viral salt bread recipe that has taken the internet by storm is perfect for your next dinner party or a night in with Netflix.",
+            "name": "How To Make Viral Salt Bread Recipe (Easy And Vegan). - The Korean Vegan",
+            "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#richSnippet",
+            "isPartOf": {
+                "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#webpage"
+            },
+            "image": {
+                "@id": "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-1.jpg"
+            },
+            "inLanguage": "en-US",
+            "mainEntityOfPage": {
+                "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#webpage"
+            }
+        },
+        {
+            "@type": "Recipe",
+            "name": "Vegan Salt Bread.",
+            "author": {
+                "@type": "Person",
+                "name": "Joanne Molinaro"
+            },
+            "description": "This vegan take on the viral salt bread recipe that has taken the internet by storm is perfect for your next dinner party or a night in with Netflix. Developed and modified from a classic Japanese bakery recipe, this salt bread recipe has been adapted to yield a tender crumb that home bakers can achieve in their own kitchen--with far less fuss and math! Full of buttery flavor and that tell-tale crisp, you&#039;ll return to this salt bread recipe over and over again!",
+            "datePublished": "2026-02-25T06:06:08+00:00",
+            "image": [
+                "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-2.jpg",
+                "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-2-500x500.jpg",
+                "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-2-500x375.jpg",
+                "https://thekoreanvegan.com/wp-content/uploads/2026/02/20260224-Screenshot-2026-02-24-at-2.57.39-PM-2-480x270.jpg"
+            ],
+            "recipeYield": [
+                "20",
+                "20 rolls"
+            ],
+            "prepTime": "PT270M",
+            "cookTime": "PT25M",
+            "recipeIngredient": [
+                "5 3/4 cups all purpose flour ((690 grams))",
+                "2 1/4 tsp instant yeast",
+                "1 tsp sea salt ((plus more for sprinkling))",
+                "2 tbsp soy milk powder ((optional))",
+                "3 tbsp organic cane sugar",
+                "3/4 cup non-dairy milk ((cold))",
+                "1 tbsp lemon juice ((or vinegar))",
+                "1 cup cold water",
+                "1/3 cup vegan butter ((cut into rough 1-inch pieces))",
+                "2 1/3 cup vegan butter ((divided evenly into 20 1-inch wide pieces))"
+            ],
+            "recipeInstructions": [
+                {
+                    "@type": "HowToStep",
+                    "text": "Add lemon juice to your cold dairy-free milk and stir (this is vegan buttermilk). Set aside. Add yeast, flour, salt, sugar, milk powder to the bowl of your stand mixer and begin mixing on low with hook attachment. Add 1 cup of cold water while continuing to mix on low until a scraggly dough begins to form. Then, add the vegan buttermilk you made earlier until a wet dough forms. Add 1/3 cup of cold butter, one cube at a time, into dough on medium. Continue to mix on medium speed until all the butter has been fully incorporated.",
+                    "name": "Add lemon juice to your cold dairy-free milk and stir (this is vegan buttermilk). Set aside. Add yeast, flour, salt, sugar, milk powder to the bowl of your stand mixer and begin mixing on low with hook attachment. Add 1 cup of cold water while continuing to mix on low until a scraggly dough begins to form. Then, add the vegan buttermilk you made earlier until a wet dough forms. Add 1/3 cup of cold butter, one cube at a time, into dough on medium. Continue to mix on medium speed until all the butter has been fully incorporated.",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#wprm-recipe-29966-step-0-0"
+                },
+                {
+                    "@type": "HowToStep",
+                    "text": "Once the butter has been fully incorporated, raise the speed to medium-high (6 on a KitchenAid) and knead the dough until it becomes relatively smooth and stretchy. Pull a piece off and stretch it against the light. If you can see through the piece without it tearing, you&#039;re done kneading. If it tears too easily, then knead for 5 more minutes. It took me a full 25 minutes of kneading at 6--after the butter had been incorporated--before I got the dough to where I wanted it.",
+                    "name": "Once the butter has been fully incorporated, raise the speed to medium-high (6 on a KitchenAid) and knead the dough until it becomes relatively smooth and stretchy. Pull a piece off and stretch it against the light. If you can see through the piece without it tearing, you&#039;re done kneading. If it tears too easily, then knead for 5 more minutes. It took me a full 25 minutes of kneading at 6--after the butter had been incorporated--before I got the dough to where I wanted it.",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#wprm-recipe-29966-step-0-1"
+                },
+                {
+                    "@type": "HowToStep",
+                    "text": "Once your dough has passed the &quot;window pane test,&quot; shape it into a ball and place it in a greased bowl. Cover it with plastic wrap or a kitchen towel. Let the dough rise at room temperature until it has doubled in size (usually about 90 minutes depending on how warm it is in your house). One good way to tell that your dough has sufficiently proofed is to stick your index finger into the dough. If it takes a long time to bounce back, you know it&#039;s ready. If it bounces back right away, continue proofing for another 10 minutes and check again. Once it has doubled in size, punch down the dough, squeezing out all the air pockets.",
+                    "name": "Once your dough has passed the &quot;window pane test,&quot; shape it into a ball and place it in a greased bowl. Cover it with plastic wrap or a kitchen towel. Let the dough rise at room temperature until it has doubled in size (usually about 90 minutes depending on how warm it is in your house). One good way to tell that your dough has sufficiently proofed is to stick your index finger into the dough. If it takes a long time to bounce back, you know it&#039;s ready. If it bounces back right away, continue proofing for another 10 minutes and check again. Once it has doubled in size, punch down the dough, squeezing out all the air pockets.",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#wprm-recipe-29966-step-0-2"
+                },
+                {
+                    "@type": "HowToStep",
+                    "text": "While your dough is proofing, divide the butter you will be using to fill the dough into 20 even blocks (each one should be about 1-inch wide). Place them in the freezer. This recipe works BEST with frozen butter blocks so do not skip this step.",
+                    "name": "While your dough is proofing, divide the butter you will be using to fill the dough into 20 even blocks (each one should be about 1-inch wide). Place them in the freezer. This recipe works BEST with frozen butter blocks so do not skip this step.",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#wprm-recipe-29966-step-0-3"
+                },
+                {
+                    "@type": "HowToStep",
+                    "text": "Divide the dough into 20 even pieces (I weighed the dough ball and it was a total of 1225 grams, which meant each individual piece was about 61 grams). Shape each individual piece into a round ball by creating a &quot;cage&quot; with your fingers and moving your hand quickly in a circular motion. Cover the dough again with plastic wrap or a kitchen towel and let the dough rest for about 40 minutes.",
+                    "name": "Divide the dough into 20 even pieces (I weighed the dough ball and it was a total of 1225 grams, which meant each individual piece was about 61 grams). Shape each individual piece into a round ball by creating a &quot;cage&quot; with your fingers and moving your hand quickly in a circular motion. Cover the dough again with plastic wrap or a kitchen towel and let the dough rest for about 40 minutes.",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#wprm-recipe-29966-step-0-4"
+                },
+                {
+                    "@type": "HowToStep",
+                    "text": "Take one of the dough balls and roughly shape it into something that resembles a carrot. Then, place it on your work surface and using a rolling pin, flatten it out so that you have a very long, narrow triangle. From tip to end, it should be at least 12 inches, though I tried to stretch mine out to 16 inches. The wider end should be about 1 1/2 inches to 2 inches wide. If your dough continues to spring back and resists being pulled, let it rest for another 10 minutes before trying again. If your dough sticks to your work surface, dust it with a tiny bit of flour.Place a butter block at the wider end of your dough triangle. Then, gently roll the dough around the butter block, making sure to keep the roll as tight and snug as possible without tearing the dough, until it reaches the very tip. Place the roll, tip side down, on a non-stick baking sheet or a baking sheet lined with parchment paper. Repeat with remaining dough balls and make sure to space the rolls so they space to grow. Cover the shaped rolls with plastic wrap or a kitchen towel or plastic wrap and let them proof for another 60 minutes (until they are nice and poofy).",
+                    "name": "Take one of the dough balls and roughly shape it into something that resembles a carrot. Then, place it on your work surface and using a rolling pin, flatten it out so that you have a very long, narrow triangle. From tip to end, it should be at least 12 inches, though I tried to stretch mine out to 16 inches. The wider end should be about 1 1/2 inches to 2 inches wide. If your dough continues to spring back and resists being pulled, let it rest for another 10 minutes before trying again. If your dough sticks to your work surface, dust it with a tiny bit of flour.Place a butter block at the wider end of your dough triangle. Then, gently roll the dough around the butter block, making sure to keep the roll as tight and snug as possible without tearing the dough, until it reaches the very tip. Place the roll, tip side down, on a non-stick baking sheet or a baking sheet lined with parchment paper. Repeat with remaining dough balls and make sure to space the rolls so they space to grow. Cover the shaped rolls with plastic wrap or a kitchen towel or plastic wrap and let them proof for another 60 minutes (until they are nice and poofy).",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#wprm-recipe-29966-step-0-5"
+                },
+                {
+                    "@type": "HowToStep",
+                    "text": "About 30 minutes into your proof, preheat your oven to 425° F. When your salt bread rolls are nice and poofy, spray them with a lot of water (about 10 to 15 spritzes of water each). This water creates steam and the steam creates &quot;oven spring,&quot; making your crust thin and crispy. Then, sprinkle the tops of each with a pinch of coarse salt before baking in the oven for 15 minutes. Rotate your sheet pans (I had to use two) and continue baking for another 10 minutes, until your salt bread rolls are golden brown. Check the bottoms to make sure they are nice and crispy! Brush them with a little melted vegan butter and enjoy!",
+                    "name": "About 30 minutes into your proof, preheat your oven to 425° F. When your salt bread rolls are nice and poofy, spray them with a lot of water (about 10 to 15 spritzes of water each). This water creates steam and the steam creates &quot;oven spring,&quot; making your crust thin and crispy. Then, sprinkle the tops of each with a pinch of coarse salt before baking in the oven for 15 minutes. Rotate your sheet pans (I had to use two) and continue baking for another 10 minutes, until your salt bread rolls are golden brown. Check the bottoms to make sure they are nice and crispy! Brush them with a little melted vegan butter and enjoy!",
+                    "url": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#wprm-recipe-29966-step-0-6"
+                }
+            ],
+            "recipeCategory": [
+                "Appetizer",
+                "Side Dish",
+                "Snack"
+            ],
+            "recipeCuisine": [
+                "Japanese"
+            ],
+            "keywords": "salt bread, salt bread recipe",
+            "nutrition": {
+                "@type": "NutritionInformation",
+                "calories": "349 kcal",
+                "carbohydrateContent": "30 g",
+                "proteinContent": "5 g",
+                "fatContent": "23 g",
+                "saturatedFatContent": "4 g",
+                "transFatContent": "4 g",
+                "sodiumContent": "307 mg",
+                "fiberContent": "1 g",
+                "sugarContent": "2 g",
+                "unsaturatedFatContent": "18 g",
+                "servingSize": "1 serving"
+            },
+            "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#recipe",
+            "mainEntityOfPage": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#webpage",
+            "isPartOf": {
+                "@id": "https://thekoreanvegan.com/viral-salt-bread-recipe-vegan/#richSnippet"
+            }
+        }
+    ]
+}

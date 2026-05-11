@@ -187,7 +187,7 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setImportMode('search')}>
               <SearchIcon className="size-4" />
-              Search with AI
+              Search the web
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,7 +1,32 @@
 import { NextResponse } from 'next/server'
-import { anthropic } from '@/lib/anthropic/client'
-import { withRetry } from '@/lib/anthropic/retry'
+import { searchWithClaude, searchWithTavily } from '@/lib/recipes/search-providers'
 import type { RecipePreview } from '@/types/recipes'
+
+const RESULTS_TO_SHOW = 6
+
+// Add new providers here — no other code needs to change.
+const PROVIDERS: Record<string, (query: string) => Promise<RecipePreview[]>> = {
+  tavily: searchWithTavily,
+  claude: searchWithClaude,
+}
+
+async function isPaywalled(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Forkcast/1.0; recipe import)' },
+      signal: AbortSignal.timeout(3_000),
+    })
+    return res.status === 402
+  } catch {
+    return false
+  }
+}
+
+async function filterPaywalled(previews: RecipePreview[]): Promise<RecipePreview[]> {
+  const paywalled = await Promise.all(previews.map((p) => isPaywalled(p.source.url)))
+  return previews.filter((_, i) => !paywalled[i]).slice(0, RESULTS_TO_SHOW)
+}
 
 export async function POST(req: Request) {
   try {
@@ -10,52 +35,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'query is required' }, { status: 400 })
     }
 
-    const response = await withRetry(() =>
-      anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        system: `You are a recipe search assistant. When the user searches for recipes,
-use the web_search tool to find relevant recipes, then respond with ONLY a JSON array
-of up to 5 recipe previews. No markdown, no explanation — just the raw JSON array.
+    // RECIPE_SEARCH_PROVIDERS is a comma-separated priority list, e.g. "tavily,claude".
+    // Each provider is tried in order; the first to succeed wins.
+    const chain = (process.env.RECIPE_SEARCH_PROVIDERS ?? 'claude')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s in PROVIDERS)
 
-Each item must match this shape exactly:
-{
-  "source": { "url": "https://...", "site_name": "Site Name" },
-  "title": "Recipe Title",
-  "image_url": "https://...",        // omit if not found
-  "description": "Brief description", // omit if not found
-  "estimated_time_min": 30,           // total time in minutes, omit if unknown
-  "estimated_servings": 4             // omit if unknown
-}
-
-Only include real recipe pages (not recipe index/category pages).
-Prefer well-known cooking sites. Do not fabricate data.`,
-        messages: [{ role: 'user', content: `Search for: ${query} recipe` }],
-      }),
-    )
-
-    // Extract the text content from Claude's final response
-    const textBlock = response.content.find((b) => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      return NextResponse.json({ error: 'No results returned' }, { status: 502 })
+    let candidates: RecipePreview[] | undefined
+    for (const name of chain) {
+      try {
+        candidates = await PROVIDERS[name](query)
+        break
+      } catch (err) {
+        const hasNext = chain.indexOf(name) < chain.length - 1
+        console.warn(`[search] ${name} failed (${err instanceof Error ? err.message : err})${hasNext ? ', trying next' : ''}`)
+      }
     }
 
-    let previews: RecipePreview[]
-    try {
-      // Strip potential markdown code fences
-      const raw = textBlock.text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
-      previews = JSON.parse(raw)
-      if (!Array.isArray(previews)) throw new Error('Expected array')
-    } catch {
-      return NextResponse.json({ error: 'Failed to parse search results' }, { status: 502 })
+    if (!candidates) {
+      return NextResponse.json({ error: 'All search providers failed' }, { status: 502 })
     }
 
-    // TODO: image_url is populated by Claude when the web search result includes it.
-    // When absent, preview cards show a placeholder icon. Server-side enrichment was
-    // removed because fetching each recipe page post-Claude-call blocked the response
-    // for up to 6s. If richer image coverage is needed, implement as a non-blocking
-    // client-side fetch after results render.
+    const previews = await filterPaywalled(candidates)
     return NextResponse.json(previews)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Search failed'

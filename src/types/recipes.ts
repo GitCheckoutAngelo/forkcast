@@ -15,6 +15,7 @@ export interface RecipeCandidate {
   cook_time_min?: number | null
   cuisine?: string
   image_url?: string
+  image_candidates?: string[]
   meal_types: Array<'breakfast' | 'lunch' | 'dinner' | 'snack'>
   tags: string[]
   instructions: string[]

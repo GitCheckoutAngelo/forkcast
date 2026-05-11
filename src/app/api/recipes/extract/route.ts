@@ -49,6 +49,21 @@ function parseImage(img: unknown): string | undefined {
   if (img && typeof img === 'object' && 'url' in img) return (img as { url: string }).url
 }
 
+function parseImages(img: unknown): string[] {
+  if (typeof img === 'string') return img ? [img] : []
+  if (Array.isArray(img)) {
+    return img.flatMap((item) => {
+      if (typeof item === 'string' && item) return [item]
+      if (item && typeof item === 'object' && 'url' in item && typeof (item as Record<string, unknown>).url === 'string') {
+        return [(item as { url: string }).url]
+      }
+      return []
+    })
+  }
+  if (img && typeof img === 'object' && 'url' in img) return [(img as { url: string }).url]
+  return []
+}
+
 function parseFraction(s: string): number {
   const parts = s.trim().split(/\s+/)
   if (parts.length === 2 && parts[1].includes('/')) {
@@ -154,6 +169,7 @@ function jsonLdToCandidate(
     cook_time_min: parseDuration(ld.cookTime),
     cuisine: typeof ld.recipeCuisine === 'string' ? ld.recipeCuisine.trim() || undefined : undefined,
     image_url: parseImage(ld.image),
+    image_candidates: parseImages(ld.image).length > 1 ? parseImages(ld.image) : undefined,
     meal_types: [],
     tags: [],
     instructions,

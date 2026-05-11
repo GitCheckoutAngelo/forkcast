@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils'
 
 export type WalkthroughItem =
   | { type: 'ready'; label: string; candidate: RecipeCandidate }
-  | { type: 'pending'; label: string; url: string }
+  | { type: 'pending'; label: string; url: string; image_url?: string }
 
 type TabStatus = 'loading' | 'ready' | 'error' | 'saved'
 
@@ -41,6 +41,7 @@ interface TabState {
   id: string
   label: string
   url: string | null
+  searchImageUrl?: string
   status: TabStatus
   candidate: RecipeCandidate | null
   error: string | null
@@ -343,6 +344,7 @@ export function SearchImportDialog({ open, onOpenChange, onItems }: SearchImport
       type: 'pending',
       label: previewMap.get(url)?.title ?? siteName(url),
       url,
+      image_url: previewMap.get(url)?.image_url,
     }))
     setIsLocking(true)
     setTimeout(() => {
@@ -522,6 +524,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
       id: `tab-${i}`,
       label: item.label || `Recipe ${i + 1}`,
       url: item.type === 'pending' ? item.url : null,
+      searchImageUrl: item.type === 'pending' ? item.image_url : undefined,
       status: item.type === 'ready' ? 'ready' : 'loading',
       candidate: item.type === 'ready' ? item.candidate : null,
       error: null,
@@ -549,11 +552,19 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Extraction failed')
       setTabs((prev) =>
-        prev.map((t) =>
-          t.id === tabId
-            ? { ...t, status: 'ready', candidate: data as RecipeCandidate, error: null }
-            : t,
-        ),
+        prev.map((t) => {
+          if (t.id !== tabId) return t
+          const candidate = data as RecipeCandidate
+          if (t.searchImageUrl && !candidate.image_candidates?.includes(t.searchImageUrl)) {
+            const base = candidate.image_candidates ?? (candidate.image_url ? [candidate.image_url] : [])
+            candidate.image_candidates = [t.searchImageUrl, ...base.filter((u) => u !== t.searchImageUrl)]
+          }
+          // Default image_url to first candidate so the picker highlights it on open
+          if (candidate.image_candidates && candidate.image_candidates.length > 0) {
+            candidate.image_url = candidate.image_candidates[0]
+          }
+          return { ...t, status: 'ready', candidate, error: null }
+        }),
       )
     } catch (err) {
       setTabs((prev) =>
@@ -676,6 +687,7 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
                   <RecipeForm
                     formId={`recipe-form-${tab.id}`}
                     defaultValues={candidateToFormValues(tab.candidate)}
+                    imageCandidates={tab.candidate.image_candidates}
                     onSubmit={(data) => handleSaveTab(tab.id, data)}
                     isSubmitting={isPending}
                   />

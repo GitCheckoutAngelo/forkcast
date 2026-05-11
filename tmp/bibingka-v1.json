@@ -1,0 +1,224 @@
+{
+    "headline": "Bibingka (Filipino Rice Cake)",
+    "@context": "https://schema.org",
+    "url": "https://www.thekitchn.com/bibingka-recipe-23700736",
+    "@type": "Recipe",
+    "publisher": {
+        "@type": "NewsMediaOrganization",
+        "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "New York",
+            "addressRegion": "NY",
+            "postalCode": "10012",
+            "streetAddress": "270 Lafayette Street, Ste 1300",
+            "addressCountry": "US"
+        },
+        "brand": {
+            "@type": "Brand",
+            "name": "The Kitchn"
+        },
+        "description": "The Kitchn provides inspiration for the food our readers want to eat, and resources for them to become the cooks they want to be.",
+        "email": "info@thekitchn.com",
+        "logo": {
+            "@type": "ImageObject",
+            "url": "https://www.thekitchn.com/static/logos/publisher-logo.png",
+            "width": 180,
+            "height": 46
+        },
+        "masthead": "https://www.thekitchn.com/team",
+        "name": "The Kitchn",
+        "parentOrganization": {
+            "@type": "Organization",
+            "name": "Apartment Therapy Media LLC",
+            "alternateName": "AT Media LLC",
+            "url": "https://www.apartmenttherapymedia.com"
+        },
+        "sameAs": [
+            "https://www.facebook.com/thekitchn/",
+            "https://www.instagram.com/thekitchn",
+            "https://www.tiktok.com/@thekitchn",
+            "https://www.youtube.com/channel/UCuNKgYLb0wOoMvclzSlBvbQ",
+            "https://www.pinterest.com/thekitchn/",
+            "https://www.apartmenttherapymedia.com/our-brands/thekitchn"
+        ],
+        "url": "https://www.thekitchn.com",
+        "telephone": "212-966-7174"
+    },
+    "description": "This fragrant coconut-infused cake will instantly transport you to Christmas time in the Philippines.",
+    "brand": {
+        "@type": "Thing",
+        "name": "The Kitchn"
+    },
+    "nutrition": {
+        "@type": "NutritionInformation",
+        "calories": "490 cal",
+        "carbohydrateContent": "67.4 g",
+        "cholesterolContent": "0 mg",
+        "fiberContent": "1.3 g",
+        "proteinContent": "6.6 g",
+        "saturatedFatContent": "14.1 g",
+        "sodiumContent": "325.2 mg",
+        "sugarContent": "35.1 g",
+        "fatContent": "22.8 g",
+        "servingSize": "Serves 6",
+        "unsaturatedFatContent": "0.0 g"
+    },
+    "suitableforDiet": "https://schema.org/VegetarianDiet",
+    "recipeCategory": [
+        "Dessert",
+        "Baked good",
+        "Snack",
+        "Cake"
+    ],
+    "recipeCuisine": [
+        "Filipino",
+        "Asia"
+    ],
+    "recipeIngredient": [
+        "  Vegetable oil, for coating the pan and leaf",
+        "1  frozen banana leaf, thawed and wiped dried",
+        "1 1/4 cups white rice flour",
+        "1/2 cup granulated sugar",
+        "2 teaspoons baking powder",
+        "1/2 teaspoon kosher salt",
+        "1 (about 13-ounce) can  unsweetened full-fat coconut milk",
+        "3  large eggs",
+        "1 teaspoon vanilla extract",
+        "1/2 cup drained macapuno or coconut sport strings in syrup, such as Buenas or Angelina (optional)",
+        "1 tablespoon vegetable oil, for greasing the pan",
+        "1 tablespoon salted or unsalted butter, at room temperature",
+        "  Unsweetened dried coconut flakes or shredded coconut, for garnish"
+    ],
+    "recipeInstructions": [
+        {
+            "@type": "HowToStep",
+            "name": "Step 1",
+            "text": "Heat the oven to 375ºF. Coat a 10-inch cast iron skillet or 9-inch round cake pan with vegetable oil. Line the pan with a thawed and dried banana leaf. Trim the edges of the leaf as needed so that it extends about 2 inches over the sides of the pan. Brush the leaf with some more vegetable oil.",
+            "image": null,
+            "url": "https://www.thekitchn.com/bibingka-recipe-23700736#step-711340186-instructiongroup-1-1"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Step 2",
+            "text": "Whisk 1 1/4 cups white rice flour, 1/2 cup granulated sugar, 2 teaspoons baking powder, and 1/2 teaspoon kosher salt together in a large bowl.",
+            "image": null,
+            "url": "https://www.thekitchn.com/bibingka-recipe-23700736#step-711340186-instructiongroup-1-2"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Step 3",
+            "text": "Make a well in the center. Add 1 (about 13-ounce) can coconut milk, 3 large eggs, and 1 teaspoon vanilla extract into the well. Starting from the center and slowly incorporating the sides, whisk together until smooth. Whisk in 1/2 cup drained macapuno if desired. Transfer into the pan and spread into an even layer.",
+            "image": null,
+            "url": "https://www.thekitchn.com/bibingka-recipe-23700736#step-711340186-instructiongroup-1-3"
+        },
+        {
+            "@type": "HowToStep",
+            "name": "Step 4",
+            "text": "Bake until the center is set and the top is lightly browned, about 45 minutes. Brush the top with 1 tablespoon room temperature butter and sprinkle with unsweetened coconut flakes. Let cool for 15 minutes before serving. Cut directly in the pan and serve, leaving the banana leaf behind.",
+            "image": null,
+            "url": "https://www.thekitchn.com/bibingka-recipe-23700736#step-711340186-instructiongroup-1-4"
+        },
+        {
+            "@type": "HowToSection",
+            "name": "Recipe Notes",
+            "itemListElement": [
+                {
+                    "@type": "HowToTip",
+                    "text": "Storage: Wrap any leftovers in aluminum foil or plastic wrap and store at room temperature for up to 2 days, or refrigerate for up to 1 week."
+                }
+            ]
+        }
+    ],
+    "recipeYield": 6,
+    "prepTime": "PT900S",
+    "cookTime": "PT2700S",
+    "totalTime": "PT3600S",
+    "review": [
+        {
+            "@type": "Review",
+            "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": 5
+            },
+            "author": {
+                "@type": "Person",
+                "name": "JanValdez"
+            },
+            "reviewBody": "I cross-tested this recipe for Ria and it&#39;s perfect! Bibingka was one of my favorite desserts growing up and this version is so good. I&#39;ve already made it twice since, and my family absolutely loved it. ",
+            "datePublished": "2025-06-26"
+        }
+    ],
+    "aggregateRating": {
+        "@type": "AggregateRating",
+        "@id": "https://www.thekitchn.com/bibingka-recipe-23700736/#aggregate-rating"
+    },
+    "@id": "https://www.thekitchn.com/bibingka-recipe-23700736/#post-recipe-711340186",
+    "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "recipeID",
+        "value": "711340186"
+    },
+    "name": "Bibingka (Filipino Rice Cake)",
+    "articleSection": "Recipes",
+    "thumbnailUrl": "https://cdn.apartmenttherapy.info/image/upload/f_auto,q_auto:eco,c_fill,g_auto,w_1500,ar_3:2/k%2FPhoto%2FRecipes%2F2024-12-bibingka%2Fbibingka-187",
+    "image": [
+        {
+            "@type": "ImageObject",
+            "url": "https://cdn.apartmenttherapy.info/image/upload/f_jpg,q_auto:eco,c_fill,g_auto,w_1500,ar_16:9/k%2FPhoto%2FRecipes%2F2024-12-bibingka%2Fbibingka-187"
+        },
+        {
+            "@type": "ImageObject",
+            "url": "https://cdn.apartmenttherapy.info/image/upload/f_jpg,q_auto:eco,c_fill,g_auto,w_1500,ar_4:3/k%2FPhoto%2FRecipes%2F2024-12-bibingka%2Fbibingka-187"
+        },
+        {
+            "@type": "ImageObject",
+            "url": "https://cdn.apartmenttherapy.info/image/upload/f_jpg,q_auto:eco,c_fill,g_auto,w_1500,ar_1:1/k%2FPhoto%2FRecipes%2F2024-12-bibingka%2Fbibingka-187"
+        }
+    ],
+    "primaryImageOfPage": {
+        "@type": "ImageObject",
+        "url": "https://cdn.apartmenttherapy.info/image/upload/v1734724113/k/Photo/Recipes/2024-12-bibingka/bibingka-187.jpg"
+    },
+    "author": [
+        {
+            "name": "Ria Elciario-McKeown",
+            "url": "https://www.thekitchn.com/authors/ria-elciario-mckeown",
+            "description": "Ria Elciario-McKeown is a Filipino-Canadian writer and recipe developer. She is the author of the forthcoming cookbook, Make It Plant-Based Filipino. Her recipes have been published in Food52, Food Network Canada, and Chatelaine Magazine. When she’s not working on food, Ria works as a creative producer and screenwriter.",
+            "jobTitle": null,
+            "@type": "Person"
+        }
+    ],
+    "reviewedBy": [
+        {
+            "name": "Jan Valdez",
+            "url": "https://www.thekitchn.com/authors/jan-valdez",
+            "description": "I cover recipe content on The Kitchn, write and update recipes and recipe roundups, and test recipes for the team. I have 10 years of experience working in R&D test kitchens, testing products and recipes, and at publishers including Serious Eats and EatingWell.",
+            "jobTitle": "Associate Recipe Producer",
+            "@type": "Person"
+        }
+    ],
+    "creator": {
+        "@type": "Person",
+        "name": "Ria Elciario-McKeown"
+    },
+    "keywords": [
+        "appetizers-snacks",
+        "asian",
+        "baked-goods",
+        "baking",
+        "cake",
+        "christmas",
+        "dessert",
+        "fall",
+        "make-ahead",
+        "pantry",
+        "recipe",
+        "snacks",
+        "vegetarian"
+    ],
+    "mainEntityOfPage": "https://www.thekitchn.com/bibingka-recipe-23700736",
+    "dateCreated": "2024-12-24T12:00:00-05:00",
+    "datePublished": "2024-12-24T12:00:00-05:00",
+    "dateModified": "2024-12-24T12:00:00-05:00",
+    "abstract": null
+}
