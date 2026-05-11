@@ -528,6 +528,12 @@ const SECTIONS: { id: FormSection; label: string }[] = [
 
 export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-form', imageCandidates }: RecipeFormProps) {
   const [section, setSection] = useState<FormSection>('overview')
+  const [visited, setVisited] = useState<Set<FormSection>>(new Set(['overview']))
+
+  function handleSectionChange(s: FormSection) {
+    setSection(s)
+    setVisited((prev) => (prev.has(s) ? prev : new Set([...prev, s])))
+  }
 
   const {
     register,
@@ -722,7 +728,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
       {/* Section tabs */}
       <div className="relative mb-6 flex rounded-lg bg-muted p-1">
         <div
-          className="pointer-events-none absolute inset-y-1 rounded-md bg-background shadow-sm transition-all duration-200 ease-in-out"
+          className="pointer-events-none absolute inset-y-1 rounded-md bg-background shadow-sm transition-[left] duration-200 ease-in-out"
           style={{
             width: 'calc((100% - 8px) / 4)',
             left: `calc(4px + ${SECTIONS.findIndex((s) => s.id === section)} * ((100% - 8px) / 4))`,
@@ -732,7 +738,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
           <button
             key={s.id}
             type="button"
-            onClick={() => setSection(s.id)}
+            onClick={() => handleSectionChange(s.id)}
             className={cn(
               'relative z-10 flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
               section === s.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
@@ -817,67 +823,72 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
 
       {/* Ingredients */}
       <div className={cn('flex flex-col gap-3', section !== 'ingredients' && 'hidden')}>
-        <div className="flex items-center justify-between gap-2">
-          <Label>Ingredients</Label>
+        {visited.has('ingredients') && <>
+          <div className="flex items-center justify-between gap-2">
+            <Label>Ingredients</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={ingredientFields.length === 0 || isReparsing}
+              onClick={handleReparseIngredients}
+            >
+              {isReparsing ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Sparkles className="mr-1.5 size-3.5" />}
+              {isReparsing ? 'Parsing…' : 'Re-parse with AI'}
+            </Button>
+          </div>
+          {reparseError && <p className="text-xs text-destructive">{reparseError}</p>}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIngredientDragEnd}>
+            <SortableContext items={ingredientFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+              <div className="flex flex-col gap-2">
+                {ingredientFields.map((field, index) => (
+                  <SortableIngredientRow key={field.id} id={field.id} index={index} register={register} onRemove={removeIngredient} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            disabled={ingredientFields.length === 0 || isReparsing}
-            onClick={handleReparseIngredients}
+            className="self-start"
+            onClick={() => appendIngredient({ quantity: null, unit: '', name: '', preparation: '', raw_text: '' })}
           >
-            {isReparsing ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Sparkles className="mr-1.5 size-3.5" />}
-            {isReparsing ? 'Parsing…' : 'Re-parse with AI'}
+            <Plus className="mr-1 size-3.5" />
+            Add Ingredient
           </Button>
-        </div>
-        {reparseError && <p className="text-xs text-destructive">{reparseError}</p>}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIngredientDragEnd}>
-          <SortableContext items={ingredientFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-2">
-              {ingredientFields.map((field, index) => (
-                <SortableIngredientRow key={field.id} id={field.id} index={index} register={register} onRemove={removeIngredient} />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="self-start"
-          onClick={() => appendIngredient({ quantity: null, unit: '', name: '', preparation: '', raw_text: '' })}
-        >
-          <Plus className="mr-1 size-3.5" />
-          Add Ingredient
-        </Button>
+        </>}
       </div>
 
       {/* Instructions */}
       <div className={cn('flex flex-col gap-3', section !== 'instructions' && 'hidden')}>
-        <Label>Instructions</Label>
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleInstructionDragEnd}>
-          <SortableContext items={instructionFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-2">
-              {instructionFields.map((field, index) => (
-                <SortableInstructionRow key={field.id} id={field.id} index={index} register={register} onRemove={removeInstruction} />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="self-start"
-          onClick={() => appendInstruction({ text: '' })}
-        >
-          <Plus className="mr-1 size-3.5" />
-          Add Step
-        </Button>
+        {visited.has('instructions') && <>
+          <Label>Instructions</Label>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleInstructionDragEnd}>
+            <SortableContext items={instructionFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+              <div className="flex flex-col gap-2">
+                {instructionFields.map((field, index) => (
+                  <SortableInstructionRow key={field.id} id={field.id} index={index} register={register} onRemove={removeInstruction} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="self-start"
+            onClick={() => appendInstruction({ text: '' })}
+          >
+            <Plus className="mr-1 size-3.5" />
+            Add Step
+          </Button>
+        </>}
       </div>
 
       {/* Nutrition */}
       <div className={cn('flex flex-col gap-3', section !== 'nutrition' && 'hidden')}>
+        {visited.has('nutrition') && <>
         <div className="flex items-center justify-between gap-2">
           <Label>Macros per serving</Label>
           <span
@@ -974,6 +985,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
             </label>
           )}
         />
+        </>}
       </div>
     </form>
     {calcState && (

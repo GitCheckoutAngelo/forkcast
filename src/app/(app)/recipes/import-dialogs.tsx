@@ -585,6 +585,13 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
   const [showConfirmClose, setShowConfirmClose] = useState(false)
   const [savedCount, setSavedCount] = useState(0)
   const [isPending, startTransition] = useTransition()
+  const tabButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
+
+  useEffect(() => {
+    const el = tabButtonRefs.current.get(activeTabId)
+    if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth })
+  }, [activeTabId, tabs])
   // Tracks which tab ids have had extraction fired to prevent double-firing
   const extractingRef = useRef<Set<string>>(new Set())
 
@@ -744,17 +751,22 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
         </DialogHeader>
 
         {/* Tab strip */}
-        <div className="flex shrink-0 overflow-x-auto border-b">
+        <div className="relative flex shrink-0 overflow-x-auto border-b">
+          {indicator && (
+            <div
+              className="absolute bottom-0 h-0.5 bg-primary transition-[left,width] duration-200 ease-in-out"
+              style={{ left: indicator.left, width: indicator.width }}
+            />
+          )}
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
+              ref={(el) => { if (el) tabButtonRefs.current.set(tab.id, el); else tabButtonRefs.current.delete(tab.id) }}
               type="button"
               onClick={() => setActiveTabId(tab.id)}
               className={cn(
-                'flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm transition-colors',
-                tab.id === activeTabId
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
+                'flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-sm transition-colors',
+                tab.id === activeTabId ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 tab.status === 'saved' && 'text-emerald-600',
                 tab.status === 'skipped' && tab.id !== activeTabId && 'opacity-40',
                 tab.status === 'error' && tab.id !== activeTabId && 'text-destructive/70',

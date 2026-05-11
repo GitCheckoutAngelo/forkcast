@@ -318,7 +318,7 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
         open={dialog === 'edit' && !!activeRecipe}
         onOpenChange={(open) => !open && closeDialog()}
       >
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="flex h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
           <DialogHeader className="shrink-0 border-b px-6 py-4">
             <DialogTitle>Edit Recipe</DialogTitle>
           </DialogHeader>
