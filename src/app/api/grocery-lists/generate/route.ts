@@ -44,10 +44,71 @@ type Contribution = IngredientContribution | FoodItemContribution
 
 // ── Quantity formatting ───────────────────────────────────────────────────────
 
+const IMPERIAL_CONVERSIONS: Record<string, { factor: number; to: 'g' | 'ml' }> = {
+  oz: { factor: 28, to: 'g' },
+  ounce: { factor: 28, to: 'g' },
+  ounces: { factor: 28, to: 'g' },
+  lb: { factor: 454, to: 'g' },
+  lbs: { factor: 454, to: 'g' },
+  pound: { factor: 454, to: 'g' },
+  pounds: { factor: 454, to: 'g' },
+  'fl oz': { factor: 30, to: 'ml' },
+  'fluid ounce': { factor: 30, to: 'ml' },
+  'fluid ounces': { factor: 30, to: 'ml' },
+  pint: { factor: 480, to: 'ml' },
+  pints: { factor: 480, to: 'ml' },
+  pt: { factor: 480, to: 'ml' },
+}
+
+// Grocery-friendly rounding for metric weight/volume values.
+// Used on both contributions going into the AI and on the AI's output strings.
+function applyMetricRounding(qty: number, unit: 'g' | 'kg' | 'ml' | 'L'): [number, 'g' | 'kg' | 'ml' | 'L'] {
+  if (unit === 'g' && qty >= 500) return [Math.round(qty / 100) / 10, 'kg']
+  if (unit === 'ml' && qty >= 1000) return [Math.round(qty / 100) / 10, 'L']
+  if (unit === 'kg') return [Math.round(qty * 10) / 10, 'kg']
+  if (unit === 'L') return [Math.round(qty * 10) / 10, 'L']
+  if (unit === 'g') {
+    if (qty < 10)  return [Math.round(qty * 10) / 10, 'g']
+    if (qty < 100) return [Math.round(qty / 5) * 5, 'g']
+    return [Math.round(qty / 25) * 25, 'g']
+  }
+  // ml
+  if (qty < 25)  return [Math.round(qty * 10) / 10, 'ml']
+  if (qty < 100) return [Math.round(qty / 5) * 5, 'ml']
+  if (qty < 500) return [Math.round(qty / 25) * 25, 'ml']
+  return [Math.round(qty / 50) * 50, 'ml']
+}
+
+function normalizeQty(qty: number, unit: string): [number, string] {
+  const key = unit.trim().toLowerCase()
+  const conv = IMPERIAL_CONVERSIONS[key]
+  const q = conv ? qty * conv.factor : qty
+  const u = conv ? conv.to : key
+
+  if (u === 'g' || u === 'kg' || u === 'ml' || u === 'L') {
+    return applyMetricRounding(q, u as 'g' | 'kg' | 'ml' | 'L')
+  }
+  return [Math.round(q * 100) / 100, conv ? u : unit]
+}
+
+// Re-rounds the AI's free-form quantity_text for simple g/kg/ml/L patterns.
+function cleanQuantityText(text: string): string {
+  const m = text.trim().match(/^([\d.]+)\s*(g|kg|ml|mL|L)$/i)
+  if (!m) return text
+  const qty = parseFloat(m[1])
+  if (isNaN(qty) || qty <= 0) return text
+  const rawUnit = m[2]
+  const unit = (rawUnit.toLowerCase() === 'l' ? 'L' : rawUnit.toLowerCase()) as 'g' | 'kg' | 'ml' | 'L'
+  const [rq, ru] = applyMetricRounding(qty, unit)
+  const decimals = ru === 'kg' || ru === 'L' ? 1 : 0
+  return `${rq.toFixed(decimals)} ${ru}`
+}
+
 function formatQty(quantity: number | null, unit: string | null, rawText: string): string {
   if (quantity !== null && quantity > 0) {
-    const rounded = Math.round(quantity * 100) / 100
-    return unit ? `${rounded} ${unit}` : `${rounded}`
+    const [q, u] = unit ? normalizeQty(quantity, unit) : [quantity, null]
+    const display = parseFloat((Math.round(q * 100) / 100).toFixed(2))
+    return u ? `${display} ${u}` : `${display}`
   }
   return unit ?? rawText
 }
@@ -140,7 +201,7 @@ async function aggregateWithClaude(
 
 Rules:
 1. Group identical or equivalent ingredients into one item ("yellow onion", "onion", "medium onion" → "onion").
-2. Sum quantities into a readable string using metric units (g, kg, ml, L, tbsp, tsp). Convert imperial quantities where possible ("1 lb chicken" → "450g"). For countable items use natural language ("3 medium onions").
+2. Sum quantities into a readable string. Convert imperial weight/volume to metric first (1 oz→28g, 1 lb→454g, 1 fl oz→30ml, 1 pint→480ml), then apply scale-up rounding: ≥500g express in kg rounded to 1 decimal (e.g. 908g→0.9kg, 1360g→1.4kg); ≥1000ml express in L rounded to 1 decimal. Keep cups, tbsp, tsp as-is — do not convert them to ml. For countable items use natural language ("3 medium onions").
 3. Assign one category: produce, dairy, protein, pantry, frozen, bakery, or other.
 4. food_item entries stay as their own line — do not break into sub-ingredients.
 5. In "src", list the "i" values of every contribution that belongs to this item.${stapleClause}
@@ -181,7 +242,7 @@ Output schema: [{"name":"...","quantity_text":"...","category":"produce","notes"
   return result.data.map((item) => ({
     id: crypto.randomUUID(),
     name: item.name,
-    quantity_text: item.quantity_text,
+    quantity_text: cleanQuantityText(item.quantity_text),
     category: item.category,
     checked: false,
     is_pantry_staple: item.ps,

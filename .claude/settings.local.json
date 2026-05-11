@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(Get-ChildItem -Path \"c:\\\\Code\\\\Code_Angelo\\\\_PERSONAL\\\\forkcast\" -Recurse -Directory)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Recurse -Path \"c:\\\\Code\\\\Code_Angelo\\\\_PERSONAL\\\\forkcast\\\\src\" -Include \"*.tsx\", \"*.ts\")",
+      "Bash(Select-String -Pattern \"GroceryItem|ingredient\" -List)",
+      "Bash(Select-Object Path)",
+      "Bash(Get-Unique)"
     ]
   }
 }

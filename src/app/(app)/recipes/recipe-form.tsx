@@ -27,7 +27,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, GripVertical, ImageOff, Loader2, Plus, Sparkles, X } from 'lucide-react'
+import { Check, GripVertical, ImageOff, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -303,6 +303,7 @@ function TagsInput({
 type IngredientRowProps = {
   id: string
   index: number
+  rawText?: string
   register: UseFormRegister<RecipeFormValues>
   onRemove: (index: number) => void
 }
@@ -310,11 +311,22 @@ type IngredientRowProps = {
 const SortableIngredientRow = memo(function SortableIngredientRow({
   id,
   index,
+  rawText,
   register,
   onRemove,
 }: IngredientRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id })
+  const [tipOpen, setTipOpen] = useState(false)
+  const leaveRef = useRef<number | null>(null)
+
+  function openTip() {
+    if (leaveRef.current !== null) { cancelAnimationFrame(leaveRef.current); leaveRef.current = null }
+    setTipOpen(true)
+  }
+  function closeTip() {
+    leaveRef.current = requestAnimationFrame(() => { setTipOpen(false); leaveRef.current = null })
+  }
 
   return (
     <div
@@ -358,6 +370,38 @@ const SortableIngredientRow = memo(function SortableIngredientRow({
         />
         <input type="hidden" {...register(`ingredients.${index}.raw_text`)} />
       </div>
+
+      {rawText ? (
+        <div className="relative mt-2.5 shrink-0">
+          <button
+            type="button"
+            onMouseEnter={openTip}
+            onMouseLeave={closeTip}
+            onFocus={openTip}
+            onBlur={closeTip}
+            className="flex text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+            aria-label="Show original text"
+          >
+            <Info className="size-4" />
+          </button>
+          <div
+            onMouseEnter={openTip}
+            onMouseLeave={closeTip}
+            className="pointer-events-none absolute bottom-full right-0 mb-2 w-64 rounded-lg bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md ring-1 ring-border"
+            style={{
+              opacity: tipOpen ? 1 : 0,
+              transform: tipOpen ? 'translateY(0)' : 'translateY(4px)',
+              transition: 'opacity 140ms ease, transform 140ms ease',
+              pointerEvents: tipOpen ? 'auto' : 'none',
+            }}
+          >
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">Original</p>
+            <p className="break-words leading-relaxed">{rawText}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2.5 size-4 shrink-0" />
+      )}
 
       <button
         type="button"
@@ -878,7 +922,7 @@ export default function RecipeForm({ defaultValues, onSubmit, formId = 'recipe-f
                 <SortableContext items={ingredientFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
                   <div className="flex flex-col gap-2">
                     {ingredientFields.map((field, index) => (
-                      <SortableIngredientRow key={field.id} id={field.id} index={index} register={register} onRemove={removeIngredient} />
+                      <SortableIngredientRow key={field.id} id={field.id} index={index} rawText={field.raw_text || undefined} register={register} onRemove={removeIngredient} />
                     ))}
                   </div>
                 </SortableContext>

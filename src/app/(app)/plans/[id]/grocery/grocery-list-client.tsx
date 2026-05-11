@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState, useTransition } from '
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ArrowLeft, Beef, ChevronDown, Loader2, Leaf, Milk, Minus, Package, Pencil, Plus, RefreshCw, Send, ShoppingCart, Snowflake, Sparkles, Tag, Wheat, X } from 'lucide-react'
+import { ArrowLeft, Beef, ChevronDown, Loader2, Leaf, Milk, Minus, Package, Plus, RefreshCw, Send, ShoppingCart, Snowflake, Sparkles, Tag, Wheat, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { toggleGroceryItem, updateGroceryItem, addCustomGroceryItem } from '@/lib/grocery-lists/actions'
+import { toggleGroceryItem, addCustomGroceryItem } from '@/lib/grocery-lists/actions'
 import type { GroceryItem, GroceryList, MealPlan } from '@/types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -85,150 +85,203 @@ function groupByCategory(items: GroceryItem[]) {
   return CATEGORY_ORDER.filter((c) => map.has(c)).map((c) => ({ category: c, items: map.get(c)! }))
 }
 
-// ── Item row ─────────────────────────────────────────────────────────────────
+// ── Grocery token ─────────────────────────────────────────────────────────────
 
-function ItemRow({
+function GroceryToken({
   item,
-  listId,
-  muted = false,
   onToggle,
-  onUpdate,
 }: {
   item: GroceryItem
-  listId: string
-  muted?: boolean
   onToggle: (id: string, checked: boolean) => void
-  onUpdate: (id: string, fields: Partial<Pick<GroceryItem, 'name' | 'quantity_text' | 'notes'>>) => void
 }) {
-  const [sourcesOpen, setSourcesOpen] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState({ name: item.name, quantity_text: item.quantity_text, notes: item.notes ?? '' })
-  const nameRef = useRef<HTMLInputElement>(null)
+  const [tooltipOpen, setTooltipOpen] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isPressed, setIsPressed] = useState(false)
+  const holdFiredRef = useRef(false)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const leaveTimerRef = useRef<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  function startEdit() {
-    setDraft({ name: item.name, quantity_text: item.quantity_text, notes: item.notes ?? '' })
-    setEditing(true)
-    setSourcesOpen(false)
-    setTimeout(() => nameRef.current?.select(), 0)
+  function clearHold() {
+    if (holdTimerRef.current !== null) {
+      clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
   }
 
-  function commitEdit() {
-    setEditing(false)
-    const fields: Partial<Pick<GroceryItem, 'name' | 'quantity_text' | 'notes'>> = {
-      name: draft.name.trim() || item.name,
-      quantity_text: draft.quantity_text.trim(),
-      notes: draft.notes.trim() || null,
+  function clearLeave() {
+    if (leaveTimerRef.current !== null) {
+      cancelAnimationFrame(leaveTimerRef.current)
+      leaveTimerRef.current = null
     }
-    const changed = fields.name !== item.name || fields.quantity_text !== item.quantity_text || fields.notes !== item.notes
-    if (!changed) return
-    onUpdate(item.id, fields)
-    updateGroceryItem(listId, item.id, fields).then((r) => {
-      if (r.error) toast.error(r.error)
+  }
+
+  function handleMouseEnter() {
+    clearLeave()
+    setIsHovered(true)
+    setTooltipOpen(true)
+  }
+
+  // Touch-only: hold 400ms to reveal tooltip
+  function startHold(e: React.PointerEvent) {
+    setIsPressed(true)
+    if (e.pointerType !== 'touch') return
+    holdFiredRef.current = false
+    clearHold()
+    holdTimerRef.current = setTimeout(() => {
+      holdFiredRef.current = true
+      setTooltipOpen(true)
+    }, 400)
+  }
+
+  function endPress(e: React.PointerEvent) {
+    setIsPressed(false)
+    if (e.pointerType !== 'touch') {
+      onToggle(item.id, !item.checked)
+      return
+    }
+    if (!holdFiredRef.current) {
+      clearHold()
+      onToggle(item.id, !item.checked)
+    } else {
+      setTooltipOpen(false)
+    }
+    holdFiredRef.current = false
+  }
+
+  function handleButtonLeave() {
+    setIsPressed(false)
+    setIsHovered(false)
+    if (!tooltipOpen) {
+      clearHold()
+      holdFiredRef.current = false
+      return
+    }
+    // Delay so cursor can move into the tooltip without it closing
+    leaveTimerRef.current = requestAnimationFrame(() => {
+      setTooltipOpen(false)
+      leaveTimerRef.current = null
     })
   }
 
-  const hasNotes = Boolean(item.notes && !editing)
+  // Close on outside tap (mobile)
+  useEffect(() => {
+    if (!tooltipOpen) return
+    function onOutside(e: TouchEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) setTooltipOpen(false)
+    }
+    document.addEventListener('touchstart', onOutside)
+    return () => document.removeEventListener('touchstart', onOutside)
+  }, [tooltipOpen])
+
+  useEffect(() => () => { clearLeave() }, [])
+
+  const tokenScale = isPressed ? 'scale(0.95)' : isHovered ? 'scale(1.03)' : 'scale(1)'
 
   return (
-    <div className={cn(muted && 'opacity-60')}>
-      <div className="flex items-center gap-1">
-        {/* 44×44 checkbox touch target */}
-        <div className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center">
-          <Checkbox
-            checked={item.checked}
-            onCheckedChange={(v) => onToggle(item.id, v === true)}
-            aria-label={`Mark ${item.name} ${item.checked ? 'unchecked' : 'checked'}`}
-          />
-        </div>
-
-        {editing ? (
-          <div className="flex flex-1 flex-col gap-1.5 py-1.5 pr-1">
-            <input
-              ref={nameRef}
-              value={draft.name}
-              onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))}
-              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
-              placeholder="Item name"
-              className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <input
-              value={draft.quantity_text}
-              onChange={(e) => setDraft((p) => ({ ...p, quantity_text: e.target.value }))}
-              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
-              placeholder="Quantity"
-              className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <input
-              value={draft.notes}
-              onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}
-              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
-              onBlur={commitEdit}
-              placeholder="Notes (optional)"
-              className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-        ) : (
-          <button
-            onClick={() => item.sources.length > 0 && setSourcesOpen((v) => !v)}
-            className={cn(
-              'flex flex-1 items-baseline gap-2 py-1.5 text-left min-w-0',
-              item.sources.length > 0 ? 'cursor-pointer' : 'cursor-default',
-            )}
-          >
-            <span className={cn(
-              'truncate text-sm',
-              item.checked && 'text-muted-foreground line-through',
-            )}>
-              {item.name}
-            </span>
-            {item.quantity_text && (
-              <span className={cn(
-                'shrink-0 text-xs text-muted-foreground tabular-nums',
-                item.checked && 'line-through',
-              )}>
-                {item.quantity_text}
-              </span>
-            )}
-          </button>
+    <div ref={containerRef} className="relative inline-block">
+      <button
+        type="button"
+        onMouseEnter={handleMouseEnter}
+        onPointerDown={startHold}
+        onPointerUp={endPress}
+        onPointerLeave={handleButtonLeave}
+        style={{
+          background: '#FFFFFF',
+          border: `1.5px solid ${tooltipOpen ? '#C85A1A' : isHovered ? '#C8A878' : '#EBD9B8'}`,
+          borderRadius: '100px',
+          padding: '9px 18px',
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '6px',
+          cursor: 'pointer',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          opacity: item.checked ? 0.4 : 1,
+          transform: tokenScale,
+          boxShadow: isHovered && !item.checked ? '0 2px 10px rgba(44,26,14,0.10)' : 'none',
+          transition: 'border-color 120ms, opacity 200ms, transform 120ms ease, box-shadow 150ms',
+          willChange: 'transform',
+        }}
+      >
+        <span style={{
+          color: '#2C1A0E',
+          fontSize: '14px',
+          fontWeight: 500,
+          textDecoration: item.checked ? 'line-through' : 'none',
+        }}>
+          {item.name}
+        </span>
+        {item.quantity_text && (
+          <span style={{
+            color: '#A07850',
+            fontSize: '12px',
+            textDecoration: item.checked ? 'line-through' : 'none',
+          }}>
+            {item.quantity_text}
+          </span>
         )}
+      </button>
 
-        {!editing && (
-          <div className="flex shrink-0 items-center gap-0.5 pr-1">
-            {item.sources.length > 0 && (
-              <button
-                onClick={() => setSourcesOpen((v) => !v)}
-                className="flex size-7 items-center justify-center rounded text-muted-foreground/50 hover:text-muted-foreground"
-                aria-label="Toggle sources"
-              >
-                <ChevronDown className={cn('size-3 transition-transform', sourcesOpen && 'rotate-180')} />
-              </button>
-            )}
-            <button
-              onClick={startEdit}
-              className="flex size-7 items-center justify-center rounded text-muted-foreground/40 opacity-0 transition-opacity hover:text-muted-foreground group-has-[div:hover]/list:opacity-0 hover:!opacity-100 focus-visible:opacity-100"
-              aria-label="Edit item"
-            >
-              <Pencil className="size-3" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {sourcesOpen && !editing && item.sources.length > 0 && (
-        <p className="pb-1 pl-[52px] pr-2 text-xs leading-relaxed text-muted-foreground">
-          {item.sources.map((s, i) => (
-            <span key={i}>
-              {i > 0 && <span className="mx-1 text-muted-foreground/40">·</span>}
-              <span className="font-medium">{s.name}</span>
-              {s.contribution && <span className="text-muted-foreground/70"> {s.contribution}</span>}
-            </span>
-          ))}
+      {/* Always mounted so exit transition plays */}
+      <div
+        onPointerEnter={clearLeave}
+        onPointerLeave={() => { clearLeave(); setTooltipOpen(false) }}
+        style={{
+          position: 'absolute',
+          top: 'calc(100% + 6px)',
+          left: '50%',
+          transform: tooltipOpen
+            ? 'translateX(-50%) translateY(0)'
+            : 'translateX(-50%) translateY(-6px)',
+          opacity: tooltipOpen ? 1 : 0,
+          pointerEvents: tooltipOpen ? 'auto' : 'none',
+          transition: 'opacity 160ms ease, transform 160ms ease',
+          background: '#2C1A0E',
+          borderRadius: '10px',
+          padding: '10px 14px',
+          zIndex: 50,
+          minWidth: '160px',
+          maxWidth: '240px',
+          willChange: 'opacity, transform',
+        }}
+      >
+        <p style={{
+          fontSize: '10px',
+          textTransform: 'uppercase',
+          color: '#A07850',
+          letterSpacing: '0.6px',
+          marginBottom: '6px',
+          whiteSpace: 'nowrap',
+        }}>
+          Used in
         </p>
-      )}
-
-      {hasNotes && (
-        <p className="pb-1 pl-[52px] text-xs italic text-muted-foreground/70">{item.notes}</p>
-      )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {item.sources.length > 0 ? item.sources.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '5px', height: '5px',
+                borderRadius: '50%',
+                background: '#C85A1A',
+                flexShrink: 0,
+              }} />
+              <span style={{ color: '#FDF6E7', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                {s.name}
+              </span>
+            </div>
+          )) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '5px', height: '5px',
+                borderRadius: '50%',
+                background: '#C85A1A',
+                flexShrink: 0,
+              }} />
+              <span style={{ color: '#FDF6E7', fontSize: '12px' }}>Added manually</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -236,13 +289,11 @@ function ItemRow({
 // ── Category section ──────────────────────────────────────────────────────────
 
 function CategorySection({
-  category, items, listId, onToggle, onUpdate,
+  category, items, onToggle,
 }: {
   category: string | null
   items: GroceryItem[]
-  listId: string
   onToggle: (id: string, checked: boolean) => void
-  onUpdate: (id: string, fields: Partial<Pick<GroceryItem, 'name' | 'quantity_text' | 'notes'>>) => void
 }) {
   const key = category?.toLowerCase() ?? 'other'
   const Icon = CATEGORY_ICONS[key] ?? Tag
@@ -253,9 +304,9 @@ function CategorySection({
         <Icon className="size-3 shrink-0" />
         {category ? (CATEGORY_LABELS[category] ?? category) : 'Other'}
       </p>
-      <div className="divide-y divide-border/50 group/list">
+      <div className="flex flex-wrap gap-2 pt-1">
         {items.map((item) => (
-          <ItemRow key={item.id} item={item} listId={listId} onToggle={onToggle} onUpdate={onUpdate} />
+          <GroceryToken key={item.id} item={item} onToggle={onToggle} />
         ))}
       </div>
     </div>
@@ -265,12 +316,10 @@ function CategorySection({
 // ── Pantry staples section ────────────────────────────────────────────────────
 
 function PantryStaplesSection({
-  items, listId, onToggle, onUpdate,
+  items, onToggle,
 }: {
   items: GroceryItem[]
-  listId: string
   onToggle: (id: string, checked: boolean) => void
-  onUpdate: (id: string, fields: Partial<Pick<GroceryItem, 'name' | 'quantity_text' | 'notes'>>) => void
 }) {
   const [open, setOpen] = useState(false)
 
@@ -288,12 +337,10 @@ function PantryStaplesSection({
       </button>
 
       {open && (
-        <div className="mt-2 group/list">
-          <div className="divide-y divide-border/30">
-            {items.map((item) => (
-              <ItemRow key={item.id} item={item} listId={listId} muted onToggle={onToggle} onUpdate={onUpdate} />
-            ))}
-          </div>
+        <div className="mt-2 flex flex-wrap gap-2 opacity-60">
+          {items.map((item) => (
+            <GroceryToken key={item.id} item={item} onToggle={onToggle} />
+          ))}
         </div>
       )}
     </div>
@@ -659,13 +706,6 @@ function TripListView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list.id])
 
-  const handleUpdate = useCallback((itemId: string, fields: Partial<Pick<GroceryItem, 'name' | 'quantity_text' | 'notes'>>) => {
-    setList((prev) => ({
-      ...prev,
-      items: prev.items.map((i) => i.id === itemId ? { ...i, ...fields } : i),
-    }))
-  }, [])
-
   const handleAddCustom = useCallback((item: GroceryItem) => {
     setList((prev) => ({ ...prev, items: [...prev.items, item] }))
     setShowAddForm(false)
@@ -772,9 +812,7 @@ function TripListView({
               key={category ?? '__other'}
               category={category}
               items={items}
-              listId={list.id}
               onToggle={handleToggle}
-              onUpdate={handleUpdate}
             />
           ))}
 
@@ -799,9 +837,7 @@ function TripListView({
           {visiblePantry.length > 0 && (
             <PantryStaplesSection
               items={visiblePantry}
-              listId={list.id}
               onToggle={handleToggle}
-              onUpdate={handleUpdate}
             />
           )}
         </div>
