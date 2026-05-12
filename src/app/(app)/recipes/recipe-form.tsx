@@ -387,7 +387,7 @@ const SortableIngredientRow = memo(function SortableIngredientRow({
           <div
             onMouseEnter={openTip}
             onMouseLeave={closeTip}
-            className="pointer-events-none absolute bottom-full right-0 mb-2 w-64 rounded-lg bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md ring-1 ring-border"
+            className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-64 rounded-lg bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md ring-1 ring-border"
             style={{
               opacity: tipOpen ? 1 : 0,
               transform: tipOpen ? 'translateY(0)' : 'translateY(4px)',

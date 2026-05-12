@@ -357,9 +357,9 @@ export default function RecipesClient({ recipes }: RecipesClientProps) {
       <UrlImportDialog
         open={importMode === 'url'}
         onOpenChange={(open) => !open && setImportMode(null)}
-        onExtracted={(candidate, fromFastPath) => {
+        onExtracted={(candidate) => {
           setImportMode(null)
-          setWalkthroughItems([{ type: 'ready', label: candidate.name, candidate, fromFastPath }])
+          setWalkthroughItems([{ type: 'ready', label: candidate.name, candidate }])
         }}
       />
 

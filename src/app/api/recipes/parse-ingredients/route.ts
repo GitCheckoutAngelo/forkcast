@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic/client'
 import { withRetry } from '@/lib/anthropic/retry'
+import { normalizeQty } from '@/lib/recipes/metric'
 
 const SYSTEM = `Parse each numbered ingredient line into structured JSON. Return ONLY a raw JSON array, no markdown, no explanation:
 [{"quantity":null,"unit":null,"name":"","preparation":null,"raw_text":""}]
-quantity: the primary (first/largest) measurement as a decimal number or null. unit: the unit for that primary measurement or null. name: clean ingredient name only — no quantities, units, or footnotes. preparation: any secondary measurements ("plus 1 tablespoon", "+ 2 tbsp") and how-to-prep notes ("chopped", "at room temperature") as a single string, or null — exclude parenthetical metric equivalents like "(218g)" or "(80g)" as those describe the whole ingredient not the secondary measure. For "or" alternatives keep only the first option. raw_text: original string exactly as given, unchanged.
-Convert imperial weight units to metric: oz→g (1 oz=28g), lbs→g (1 lb=454g). Also convert fl oz→ml (1 fl oz=30ml) and pints→ml (1 pint=480ml). Keep cups, tsp, and tbsp as-is — do not convert them to ml. After converting, apply grocery-friendly rounding: for g — 10–100g round to nearest 5g, 100–500g round to nearest 25g, ≥500g express in kg rounded to 1 decimal (e.g. 340g→350g, 2 lbs→0.9kg, 3 lbs→1.4kg); for ml — 25–100ml round to nearest 5ml, 100–500ml round to nearest 25ml, 500–1000ml round to nearest 50ml, ≥1000ml express in L rounded to 1 decimal. Already-metric units (g, kg, ml, l) get the same rounding applied. Non-volume/weight units (piece, clove, bunch, slice, sprig, pinch, can, head) stay unchanged.`
+quantity: the primary (first/largest) measurement as a decimal number (convert fractions: ½→0.5, ¼→0.25, ¾→0.75, ⅓→0.333, ⅔→0.667) or null if absent. unit: the unit exactly as written in the source text (e.g. "lb", "oz", "g", "cups"), or null. name: clean ingredient name only — no quantities, units, or footnotes. preparation: any secondary measurements ("plus 1 tablespoon", "+ 2 tbsp") and how-to-prep notes ("chopped", "at room temperature") as a single string, or null — exclude parenthetical metric equivalents like "(218g)" or "(80g)". For "or" alternatives keep only the first option. raw_text: original string exactly as given, unchanged.
+Do NOT convert units or perform any arithmetic — return quantity and unit exactly as found in the text.`
+
+interface ParsedIngredient {
+  quantity: number | null
+  unit: string | null
+  name: string
+  preparation: string | null
+  raw_text: string
+}
 
 export async function POST(req: Request) {
   try {
@@ -44,7 +53,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 502 })
     }
 
-    return NextResponse.json(parsed)
+    const normalized = (parsed as ParsedIngredient[]).map((p) => {
+      if (p.quantity !== null && p.unit) {
+        const [q, u] = normalizeQty(p.quantity, p.unit)
+        return { ...p, quantity: q, unit: u }
+      }
+      return p
+    })
+
+    return NextResponse.json(normalized)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to parse ingredients'
     return NextResponse.json({ error: message }, { status: 500 })
