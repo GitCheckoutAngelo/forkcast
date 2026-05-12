@@ -83,6 +83,7 @@ function EntryCard({
   onRefresh,
   isDeparting = false,
   onDepartureComplete,
+  isPendingMove = false,
 }: {
   entry: MealEntryResolved
   isEditMode: boolean
@@ -90,9 +91,9 @@ function EntryCard({
   onRemove: (id: string) => void
   onRestoreEntry: (id: string) => void
   onRefresh: () => void
-  // isDeparting: entry was moved away from this slot; play exit animation then notify parent.
   isDeparting?: boolean
   onDepartureComplete?: (id: string) => void
+  isPendingMove?: boolean
 }) {
   const [isPending, startTransition] = useTransition()
   const [servingsInput, setServingsInput] = useState(String(entry.servings))
@@ -142,7 +143,7 @@ function EntryCard({
   const { isDragging, setNodeRef, listeners, attributes } = useDraggable({
     id: isDeparting ? `departing-entry-${entry.id}` : `entry-${entry.id}`,
     data: { entry },
-    disabled: !isEditMode || isPending || isOptimistic || isDeparting,
+    disabled: !isEditMode || isPending || isOptimistic || isDeparting || isPendingMove,
   })
 
   const name =
@@ -203,9 +204,9 @@ function EntryCard({
               {...listeners}
               {...attributes}
               className={cn(
-                'group/entry min-h-[4rem] flex gap-1.5 border-l-[3px] py-2 pl-1.5 pr-2 transition-colors hover:bg-muted/30',
+                'group/entry min-h-[4rem] flex gap-1.5 border-l-[3px] py-2 pl-1.5 pr-2 transition-colors hover:bg-muted/30 select-none',
                 borderClass,
-                (isPending && !isRemoving) || isOptimistic ? 'opacity-60' : '',
+                (isPending && !isRemoving) || isOptimistic || isPendingMove ? 'opacity-60' : '',
                 isDragging && 'opacity-30',
                 !isDeparting && isEditMode && 'cursor-grab active:cursor-grabbing',
               )}
@@ -260,7 +261,7 @@ function EntryCard({
 
               <button
                 onClick={handleRemove}
-                disabled={isPending || isOptimistic || isDeparting}
+                disabled={isPending || isOptimistic || isDeparting || isPendingMove}
                 className="shrink-0 self-start text-muted-foreground/40 opacity-0 transition-opacity group-hover/entry:opacity-100 hover:text-destructive disabled:pointer-events-none focus:opacity-100 focus:outline-none"
                 aria-label={`Remove ${name}`}
               >

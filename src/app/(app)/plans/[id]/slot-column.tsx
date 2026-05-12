@@ -32,11 +32,13 @@ const SlotCell = memo(function SlotCell({
   onAddClick,
   isEditMode,
   onRefresh,
+  pendingMoveEntryIds,
 }: {
   slot: MealSlotResolved
   onAddClick: (slotId: string) => void
   isEditMode: boolean
   onRefresh: () => void
+  pendingMoveEntryIds: Set<string>
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot-${slot.id}` })
 
@@ -103,6 +105,7 @@ const SlotCell = memo(function SlotCell({
           onRemove={handleEntryRemove}
           onRestoreEntry={handleEntryRestore}
           onRefresh={onRefresh}
+          isPendingMove={pendingMoveEntryIds.has(entry.id)}
         />
       ))}
       {departingEntries.map((entry) => (
@@ -159,6 +162,7 @@ function SlotColumn({
   onAddClick,
   isEditMode,
   onRefresh,
+  pendingMoveEntryIds,
 }: {
   slots: MealSlotResolved[]
   slotType: MealSlotType
@@ -166,6 +170,7 @@ function SlotColumn({
   onAddClick: (slotId: string) => void
   isEditMode: boolean
   onRefresh: () => void
+  pendingMoveEntryIds: Set<string>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -295,7 +300,7 @@ function SlotColumn({
                     )}
                   </div>
                 )}
-                <SlotCell slot={slot} onAddClick={onAddClick} isEditMode={isEditMode} onRefresh={onRefresh} />
+                <SlotCell slot={slot} onAddClick={onAddClick} isEditMode={isEditMode} onRefresh={onRefresh} pendingMoveEntryIds={pendingMoveEntryIds} />
               </div>
             </Fragment>
           )

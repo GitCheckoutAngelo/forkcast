@@ -33,6 +33,7 @@ function DayRow({
   isHighlighted = false,
   isRefreshing = false,
   onRefresh,
+  pendingMoveEntryIds,
 }: {
   day: PlanDayResolved
   onAddClick: (slotId: string) => void
@@ -40,6 +41,7 @@ function DayRow({
   isHighlighted?: boolean
   isRefreshing?: boolean
   onRefresh: () => void
+  pendingMoveEntryIds: Set<string>
 }) {
   const date = new Date(day.date + 'T00:00:00')
   const dayName = SHORT_DAYS[date.getDay()]
@@ -106,6 +108,7 @@ function DayRow({
             onAddClick={onAddClick}
             onRefresh={onRefresh}
             isEditMode={isEditMode}
+            pendingMoveEntryIds={pendingMoveEntryIds}
           />
         ))}
       </div>

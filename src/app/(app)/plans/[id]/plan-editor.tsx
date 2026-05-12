@@ -437,20 +437,21 @@ export default function PlanEditor({
   // as a belt-and-suspenders guard against duplicates.
   const augmentedDays = useMemo(() => {
     if (pendingEntries.length === 0 && pendingMoves.length === 0) return plan.days
-    const movedEntryIds = new Set(pendingMoves.map((m) => m.entry.id))
     return plan.days.map((day) => {
       const affected = day.slots.some(
         (s) =>
           pendingEntries.some((p) => p.slotId === s.id) ||
-          pendingMoves.some((m) => m.toSlotId === s.id) ||
-          s.entries.some((e) => movedEntryIds.has(e.id)),
+          pendingMoves.some((m) => m.toSlotId === s.id || m.entry.meal_slot_id === s.id),
       )
       if (!affected) return day
       return {
         ...day,
         slots: day.slots.map((slot) => {
-          // Remove entries that have been moved away from this slot.
-          let entries = slot.entries.filter((e) => !movedEntryIds.has(e.id))
+          // Remove entries moved OUT of this slot only — scoped to the source slot
+          // so the destination slot isn't also filtered when the server reflects the move.
+          let entries = slot.entries.filter(
+            (e) => !pendingMoves.some((m) => m.entry.id === e.id && m.entry.meal_slot_id === slot.id),
+          )
 
           // Add optimistically-added new entries.
           const pending = pendingEntries.filter((p) => p.slotId === slot.id)
@@ -466,8 +467,11 @@ export default function PlanEditor({
             entries = [...entries, ...unconfirmed.map((p) => p.entry)]
           }
 
-          // Add entries that have been moved into this slot.
-          const movedIn = pendingMoves.filter((m) => m.toSlotId === slot.id)
+          // Add entries moved INTO this slot. Guard against duplicates if the server
+          // has already reflected the move before pendingMoves is cleared.
+          const movedIn = pendingMoves.filter(
+            (m) => m.toSlotId === slot.id && !slot.entries.some((e) => e.id === m.entry.id),
+          )
           if (movedIn.length > 0) {
             entries = [...entries, ...movedIn.map((m) => ({ ...m.entry, meal_slot_id: slot.id }))]
           }
@@ -499,6 +503,11 @@ export default function PlanEditor({
     }
     return ids
   }, [plan.days, pendingEntries, pendingMoves])
+
+  const pendingMoveEntryIds = useMemo(
+    () => new Set(pendingMoves.map((m) => m.entry.id)),
+    [pendingMoves],
+  )
 
   // Stable reference so memoized DayRow/SlotColumn/SlotCell don't re-render when
   // PlanEditor re-renders for unrelated reasons (mode toggle state, skeleton, etc.)
@@ -653,6 +662,7 @@ export default function PlanEditor({
                       isHighlighted={day.date === searchParams.get('highlight')}
                       isRefreshing={isRefreshing && affectedDayIds.has(day.id)}
                       onRefresh={handleRefresh}
+                      pendingMoveEntryIds={pendingMoveEntryIds}
                     />
                   ))
               }
