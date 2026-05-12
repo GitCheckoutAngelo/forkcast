@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 Each item must match exactly:
 {"name":"...","brand":null,"serving_size":100,"serving_unit":"g","macros_per_serving":{"calories":100,"protein_g":10,"carbs_g":15,"fat_g":3},"macros_source":"estimate","macros_source_note":"..."}
 
-serving_unit: one of serving|g|ml|piece|cup|tbsp|tsp|oz
+serving_unit: one of serving|g|ml|piece|cup|tbsp|tsp
 macros_source: brand_label (brand's own label data), usda (USDA database), estimate (AI estimate), other
 macros_source_note: brief attribution e.g. "from Chobani.com" or "USDA FDC" or "estimated from typical values"
 Include fiber_g, sugar_g, sodium_mg in macros_per_serving only when known.

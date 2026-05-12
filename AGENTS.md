@@ -95,6 +95,19 @@ POST /api/food-items/lookup    → FoodItemLookupRequest  → FoodItemCandidate[
 POST /api/food-items           → FoodItemCandidate       → FoodItem
 ```
 
+**Recipe extraction is a two-step process** (`/api/recipes/extract`):
+1. **Fast path** — fetches the URL and extracts structured data from JSON-LD (`application/ld+json` script tags). No Claude call, instant.
+2. **AI fallback** — if JSON-LD is missing or incomplete, the raw page HTML is passed to Claude to extract the recipe. Slower and costs tokens.
+
+The response includes a `fallback: true` flag when the AI path was used. The UI uses this to auto-trigger "Re-parse ingredients with AI" on first open (since AI-extracted ingredient strings tend to be cleaner than JSON-LD dumps) and to show a phase-appropriate loading indicator (spinner → sparkle icon in the tab) during extraction.
+
+**Recipe search also uses a provider chain** (`/api/recipes/search`):
+- The `RECIPE_SEARCH_PROVIDERS` env var holds a comma-separated priority list (e.g. `"tavily,claude"`). Providers are tried in order; the first to succeed wins.
+- **Tavily** — third-party search API, fast, non-AI. Requires `TAVILY_API_KEY`.
+- **Claude** — uses the `web_search` tool to find and structure results. Slower, costs tokens, but works without a Tavily key.
+- `fastOnly=true` skips AI providers so the UI can show a phase change before retrying with AI (same two-phase pattern as extraction).
+- Results are filtered for paywalled URLs (HTTP 402) and blocked domains before being returned.
+
 ## Auth + RLS
 
 All tables have RLS enabled. Policies enforce `auth.uid() = user_id` (directly for parent tables, via parent lookups for child tables). The browser uses the publishable key (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`); RLS + auth tokens are what protect data, not key secrecy.
@@ -113,6 +126,11 @@ When a user signs up via Supabase Auth, a `user_profiles` row must be created to
 - **No AI-generated meal plans yet.** Manual planning only. This may be added later — schema supports it.
 - **No AI writes to DB.** Candidates flow to user confirmation first, always.
 - **Ingredient units are free-form strings, not a dropdown.** Scraped recipes use messy units (handful, pinch, medium, to taste) that don't fit a finite enum. Unit normalization for shopping lists will be handled by AI at aggregation time, not at input time.
+
+**Unit conversion and rounding split:** imperial→metric conversion and grocery-friendly rounding happen at two distinct layers — do not collapse them.
+- **Parse stage (`/api/recipes/parse-ingredients`):** Claude converts and rounds as part of extracting quantities from free-form text. This is appropriate because the hard work (reading unstructured strings) is already Claude's job.
+- **Grocery list stage (`/api/grocery-lists/generate`):** `normalizeQty` converts and rounds deterministically in TypeScript *before* contributions reach Claude, and `cleanQuantityText` re-rounds Claude's output strings after. Do not remove these in favour of prompt instructions — structured DB values (`quantity: number, unit: string`) should never need an AI to do arithmetic.
+- Rounding thresholds: g — nearest 5g (<100g), nearest 25g (100–500g), kg 1 decimal (≥500g); ml — nearest 5ml (<100ml), nearest 25ml (100–500ml), nearest 50ml (500–1000ml), L 1 decimal (≥1000ml). cups/tsp/tbsp are kept as-is.
 
 ## Conventions
 

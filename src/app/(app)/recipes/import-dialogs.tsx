@@ -46,6 +46,7 @@ interface TabState {
   url: string | null
   searchImageUrl?: string
   status: TabStatus
+  loadingPhase?: 'reading' | 'ai'
   candidate: RecipeCandidate | null
   error: string | null
   retryable?: boolean
@@ -668,8 +669,9 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
       }
 
       let fromFastPath = true
-      if (data.fallback) {
+if (data.fallback) {
         fromFastPath = false
+        setTabs((prev) => prev.map((t) => t.id === tabId ? { ...t, loadingPhase: 'ai' } : t))
         // Step 2: AI path
         res = await fetch('/api/recipes/extract', {
           method: 'POST',
@@ -800,7 +802,11 @@ export function ImportWalkthrough({ items, open, onOpenChange, onComplete }: Imp
                 tab.status === 'error' && tab.id !== activeTabId && 'text-destructive/70',
               )}
             >
-              {tab.status === 'loading' && <Loader2 className="size-3 animate-spin" />}
+              {tab.status === 'loading' && (
+                    tab.loadingPhase === 'ai'
+                      ? <Sparkles className="size-3 animate-pulse text-primary" />
+                      : <Loader2 className="size-3 animate-spin" />
+                  )}
               {tab.status === 'saved' && <Check className="size-3 text-emerald-600" />}
               {tab.status === 'skipped' && <Minus className="size-3 text-muted-foreground" />}
               {tab.status === 'error' && <AlertCircle className="size-3 text-destructive" />}
